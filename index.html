@@ -283,8 +283,10 @@
   @keyframes spin{ to{ transform:rotate(360deg); } }
   @media (prefers-reduced-motion: reduce){ .spinner{ animation:none; } }
 
-  .order-row{ display:flex; gap:12px; align-items:center; padding:13px 16px; border-bottom:1px solid var(--border); }
+  .order-row{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; padding:13px 16px; border-bottom:1px solid var(--border); }
   .order-row:last-child{ border-bottom:none; }
+  .order-row-main{ display:flex; gap:12px; align-items:center; flex:1 1 auto; min-width:0; }
+  .order-row-meta{ display:flex; align-items:center; gap:10px; flex:0 0 auto; margin-left:auto; }
   .order-thumb{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex:0 0 auto; background:var(--surface-2); }
   .order-main{ flex:1; min-width:0; }
   .order-buyer{ font-weight:600; }
@@ -308,6 +310,35 @@
     .topbar h1{ font-size:24px; }
     .modal{ border-radius:16px 16px 0 0; max-height:92vh; }
     .modal-backdrop{ align-items:flex-end; padding:0; }
+
+    /* Order-row cards (Orders tab "Recently scanned" list): the thumbnail+buyer/item block and
+       the status-badge+View-button block each get the FULL row width instead of squeezing into
+       whatever's left after the other claims space — that squeeze is what forced a long item
+       title to wrap into a narrow, near-single-word-per-line column next to the thumbnail. */
+    .order-row-main{ flex:1 1 100%; }
+    .order-row-meta{ flex:1 1 100%; justify-content:space-between; margin-left:0; padding-left:60px; }
+
+    /* Every data table (Sales log, Payment history, preorder/batch lists) collapses from a
+       fixed-column grid — which has no room to breathe at this width and was forcing long cell
+       text to wrap into a tall, cramped column instead of the row just scrolling or reflowing —
+       into a stack of labeled key/value rows instead. Each <td> already carries a data-label
+       attribute matching its column header (added specifically for this), shown via ::before
+       so the column headers themselves can be hidden without losing that context. */
+    .table-wrap table, .table-wrap tbody, .table-wrap tr{ display:block; width:100%; }
+    .table-wrap thead{ display:none; }
+    .table-wrap tr{ padding:12px 16px; border-bottom:1px solid var(--border); }
+    .table-wrap tr:last-child{ border-bottom:none; }
+    .table-wrap td{
+      display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
+      padding:5px 0; border-bottom:none; text-align:right;
+    }
+    .table-wrap td::before{
+      content:attr(data-label); font-size:11.5px; font-weight:600; color:var(--muted);
+      text-align:left; flex:0 0 auto; padding-top:1px;
+    }
+    .table-wrap td.cell-note{ max-width:none; white-space:normal; overflow:visible; text-overflow:clip; }
+    .table-wrap td .order-sub{ text-align:right; }
+    .table-wrap td .row-actions{ justify-content:flex-end; }
   }
 </style>
 </head>
@@ -1866,7 +1897,7 @@
         var p = productById(b.productId);
         var du = daysUntil(b.expectedArrival);
         var when = b.expectedArrival ? fmtDate(b.expectedArrival) + (du!=null ? (du<0 ? " <span class='badge overdue'>"+Math.abs(du)+"d overdue</span>" : " <span class='hint'>("+du+"d)</span>") : "") : "—";
-        html += "<tr><td>"+esc(p?p.name:"—")+"</td><td><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td><td class='num-cell'>"+b.quantity+"</td><td>"+when+"</td><td><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td></tr>";
+        html += "<tr><td data-label='Item'>"+esc(p?p.name:"—")+"</td><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td><td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td data-label='Expected'>"+when+"</td><td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td></tr>";
       });
       html += "</tbody></table></div>";
     }
@@ -1892,11 +1923,11 @@
         batches.forEach(function(b){
           var du = daysUntil(b.expectedArrival);
           var dateCell = b.status==="received" ? fmtDate(b.receivedDate) : (b.expectedArrival ? fmtDate(b.expectedArrival)+(du!=null&&du<0?" <span class='badge overdue'>late</span>":"") : "—");
-          html += "<tr><td><div class='owner-cell'>"+(b.needsReview?"<span class='badge review'>confirm</span>":"")+"<span class='badge owner-"+b.owner+"'>"+b.owner+"</span></div></td>"+
-            "<td class='num-cell'>"+b.quantity+"</td><td class='num-cell'>"+money(b.unitCost)+"</td><td class='num-cell'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
-            "<td><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td>"+dateCell+"</td>"+
-            "<td class='cell-note' title='"+esc(b.note||"")+"'>"+esc(b.note||"")+"</td>"+
-            "<td><div class='row-actions'>"+
+          html += "<tr><td data-label='Owner'><div class='owner-cell'>"+(b.needsReview?"<span class='badge review'>confirm</span>":"")+"<span class='badge owner-"+b.owner+"'>"+b.owner+"</span></div></td>"+
+            "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+money(b.unitCost)+"</td><td class='num-cell' data-label='Total'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
+            "<td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td data-label='Expected / Received'>"+dateCell+"</td>"+
+            "<td class='cell-note' data-label='Note' title='"+esc(b.note||"")+"'>"+esc(b.note||"")+"</td>"+
+            "<td data-label='Actions'><div class='row-actions'>"+
               (b.status!=="received" ? "<button class='btn small' data-action='mark-received' data-id='"+b.id+"'>Received</button>" : "") +
               "<button class='btn small ghost' data-action='edit-batch' data-id='"+b.id+"'>Edit</button>"+
               "<button class='btn small ghost danger' data-action='delete-batch' data-id='"+b.id+"'>Remove</button>"+
@@ -1932,10 +1963,10 @@
       var when = b.expectedArrival ? fmtDate(b.expectedArrival) : "—";
       if (du!=null && du<0) when += " <span class='badge overdue'>"+Math.abs(du)+"d overdue</span>";
       else if (du!=null) when += " <span class='hint'>("+du+"d)</span>";
-      html += "<tr><td>"+esc(p?p.name:"—")+"</td><td><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td>"+
-        "<td class='num-cell'>"+b.quantity+"</td><td class='num-cell'>"+money(b.unitCost)+"</td><td class='num-cell'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
-        "<td><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td>"+when+"</td>"+
-        "<td><button class='btn small' data-action='mark-received' data-id='"+b.id+"'>Mark received</button></td></tr>";
+      html += "<tr><td data-label='Item'>"+esc(p?p.name:"—")+"</td><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td>"+
+        "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+money(b.unitCost)+"</td><td class='num-cell' data-label='Committed'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
+        "<td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td data-label='Expected'>"+when+"</td>"+
+        "<td data-label='Actions'><button class='btn small' data-action='mark-received' data-id='"+b.id+"'>Mark received</button></td></tr>";
     });
     html += "</tbody></table></div>";
     return html;
@@ -1949,10 +1980,10 @@
     rows.forEach(function(s){
       var p = productById(s.productId);
       var statusBadge = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
-      html += "<tr><td>"+fmtDate(s.saleDate)+"</td><td>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</td>"+
-        "<td>"+esc(s.buyerName||"—")+"</td><td class='num-cell'>"+s.quantitySold+"</td><td class='num-cell'>"+money(s.netProfit)+"</td>"+
-        "<td><span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></td><td>"+statusBadge+"</td>"+
-        "<td><div class='row-actions'>"+
+      html += "<tr><td data-label='Date'>"+fmtDate(s.saleDate)+"</td><td data-label='Item'>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</td>"+
+        "<td data-label='Buyer'>"+esc(s.buyerName||"—")+"</td><td class='num-cell' data-label='Qty'>"+s.quantitySold+"</td><td class='num-cell' data-label='Net profit'>"+money(s.netProfit)+"</td>"+
+        "<td data-label='Goes to'><span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></td><td data-label='Status'>"+statusBadge+"</td>"+
+        "<td data-label='Actions'><div class='row-actions'>"+
           (s.screenshots&&s.screenshots.length ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
           "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
           "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
@@ -1988,13 +2019,17 @@
         var p = productById(s.productId);
         var shot = s.screenshots[s.screenshots.length-1];
         html += "<div class='order-row'>"+
-          "<img class='order-thumb' src='"+esc(shot.id)+"' alt=''>"+
-          "<div class='order-main'>"+
-            "<div class='order-buyer'>"+esc(s.buyerName||"Unknown buyer")+"</div>"+
-            "<div class='order-sub'>"+esc(p?p.name:"—")+(s.orderNumber?" · #"+esc(s.orderNumber):"")+" · "+money(s.netProfit)+" → <span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></div>"+
+          "<div class='order-row-main'>"+
+            "<img class='order-thumb' src='"+esc(shot.id)+"' alt=''>"+
+            "<div class='order-main'>"+
+              "<div class='order-buyer'>"+esc(s.buyerName||"Unknown buyer")+"</div>"+
+              "<div class='order-sub'>"+esc(p?p.name:"—")+(s.orderNumber?" · #"+esc(s.orderNumber):"")+" · "+money(s.netProfit)+" → <span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></div>"+
+            "</div>"+
           "</div>"+
-          (s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "")+
-          "<div class='row-actions'><button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button></div>"+
+          "<div class='order-row-meta'>"+
+            (s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "<span></span>")+
+            "<div class='row-actions'><button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button></div>"+
+          "</div>"+
         "</div>";
       });
       html += "</div>";
@@ -2011,9 +2046,9 @@
     if (!rows.length){ html += "<div class='card empty'><div class='ic' data-icon='settlements'></div>No payments logged between you two yet.</div>"; return html; }
     html += "<div class='card table-wrap'><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>";
     rows.slice().reverse().forEach(function(t){
-      html += "<tr><td>"+fmtDate(t.date)+"</td><td><span class='badge owner-"+t.from+"'>"+t.from+"</span></td><td><span class='badge owner-"+t.to+"'>"+t.to+"</span></td>"+
-        "<td class='num-cell'>"+money(t.amount)+"</td><td class='cell-note' title='"+esc(t.note||"")+"'>"+esc(t.note||"")+"</td>"+
-        "<td><button class='btn small ghost danger' data-action='delete-settlement' data-id='"+t.id+"'>Remove</button></td></tr>";
+      html += "<tr><td data-label='Date'>"+fmtDate(t.date)+"</td><td data-label='From'><span class='badge owner-"+t.from+"'>"+t.from+"</span></td><td data-label='To'><span class='badge owner-"+t.to+"'>"+t.to+"</span></td>"+
+        "<td class='num-cell' data-label='Amount'>"+money(t.amount)+"</td><td class='cell-note' data-label='Note' title='"+esc(t.note||"")+"'>"+esc(t.note||"")+"</td>"+
+        "<td data-label='Actions'><button class='btn small ghost danger' data-action='delete-settlement' data-id='"+t.id+"'>Remove</button></td></tr>";
     });
     html += "</tbody></table></div>";
     return html;
