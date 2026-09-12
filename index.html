@@ -1980,7 +1980,7 @@
     rows.forEach(function(s){
       var p = productById(s.productId);
       var statusBadge = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
-      html += "<tr><td data-label='Date'>"+fmtDate(s.saleDate)+"</td><td data-label='Item'>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</td>"+
+      html += "<tr><td data-label='Date'>"+fmtDate(s.saleDate)+"</td><td data-label='Item'><div>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</div></td>"+
         "<td data-label='Buyer'>"+esc(s.buyerName||"—")+"</td><td class='num-cell' data-label='Qty'>"+s.quantitySold+"</td><td class='num-cell' data-label='Net profit'>"+money(s.netProfit)+"</td>"+
         "<td data-label='Goes to'><span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></td><td data-label='Status'>"+statusBadge+"</td>"+
         "<td data-label='Actions'><div class='row-actions'>"+
