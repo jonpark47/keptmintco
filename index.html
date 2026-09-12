@@ -537,6 +537,43 @@
     return { buyerName: original, lowConfidence: originalLowConfidence, conflict: { original: original, zoomed: zoomed } };
   }
 
+  // Pure decision function for the payment-breakdown conflict (Subtotal disagreed with
+  // Order total - Shipping - Sales tax) — pulled out on its own, same reasoning as
+  // reconcileUsername, so the actual DECISION can be unit-tested without needing the OCR/zoom
+  // calls that produce its inputs (which can't run outside a browser). Given the original
+  // three payment-breakdown fields plus a zoomed independent re-read of each, finds which
+  // SINGLE field's re-read — substituted in on its own, holding the other two at their
+  // original values — makes "orderTotal = subtotal + shipping + salesTax" balance again. That
+  // field is treated as the likely culprit and gets corrected; the other two (including
+  // Subtotal itself, which was probably already right) are left untouched. Falls back to
+  // trusting Subtotal's own re-read if it independently reconfirms the original value even
+  // when no single substitution balances the equation; returns null (genuinely irreducible)
+  // otherwise.
+  function findBreakdownCulprit(orig, zoomed, orderTotal){
+    function balances(st, sh, tax){
+      return orderTotal != null && st != null && sh != null && tax != null &&
+        Math.abs(orderTotal - (st + sh + tax)) <= 0.02;
+    }
+    var candidates = [];
+    if (zoomed.subtotal != null && Math.abs(zoomed.subtotal - orig.subtotal) > 0.02 &&
+        balances(zoomed.subtotal, orig.shipping, orig.salesTax)){
+      candidates.push({ field: "subtotal", value: zoomed.subtotal });
+    }
+    if (zoomed.shipping != null && Math.abs(zoomed.shipping - orig.shipping) > 0.02 &&
+        balances(orig.subtotal, zoomed.shipping, orig.salesTax)){
+      candidates.push({ field: "shipping", value: zoomed.shipping });
+    }
+    if (zoomed.salesTax != null && Math.abs(zoomed.salesTax - orig.salesTax) > 0.02 &&
+        balances(orig.subtotal, orig.shipping, zoomed.salesTax)){
+      candidates.push({ field: "salesTax", value: zoomed.salesTax });
+    }
+    if (candidates.length === 1) return { resolved: true, culprit: candidates[0] };
+    if (candidates.length === 0 && zoomed.subtotal != null && Math.abs(zoomed.subtotal - orig.subtotal) <= 0.02){
+      return { resolved: true, culprit: null };
+    }
+    return { resolved: false, culprit: null };
+  }
+
   // Order numbers have no redundant copy anywhere else on the page to cross-check against
   // (unlike net profit, which can be verified against the other totals) — the only lever left
   // is giving OCR more actual pixels per digit to work with. A full-page image reduces the
@@ -2452,15 +2489,85 @@
               extracted.orderEarnings = conflict.computed;
               extracted.earningsConflict = null;
             } else if (agreesWithOriginal && !agreesWithComputed){
-              // The zoom instead backs up the ORIGINAL reading — evidence one of the fee/tax
-              // inputs feeding the computed formula was itself misread. orderEarnings is
-              // already the original value (never overwritten), so just clear the conflict.
-              extracted.earningsConflict = null;
+              // The zoom backs up the ORIGINAL reading over the computed one — same
+              // "find the actual culprit" idea as the payment-breakdown check below: check
+              // whether Transaction fees or Shipping label cost (the two single-read, no
+              // redundancy inputs feeding the computed formula) was itself misread, by trying
+              // each one's own independent magnified re-read as the one thing that changed.
+              var feeLines = flattenLines(resultA.data);
+              function findFeeLineBbox(labelRe){
+                for (var fli=0; fli<feeLines.length; fli++){ if (labelRe.test(feeLines[fli].text||"")) return feeLines[fli].bbox; }
+                return null;
+              }
+              var txnFeeBbox = findFeeLineBbox(/Transaction fees/i);
+              var shipLabelBbox = findFeeLineBbox(/Shipping label/i);
+              var zoomedTxnFee = txnFeeBbox ? await zoomField(txnFeeBbox, 5, function(r){ return r.transactionFees; }) : null;
+              var zoomedShipLabel = shipLabelBbox ? await zoomField(shipLabelBbox, 5, function(r){ return r.shippingLabelCost; }) : null;
+              var origTxnFee = extracted.transactionFees, origShipLabel = extracted.shippingLabelCost;
+              function earningsBalances(fee, shipLbl){
+                return Math.abs(conflict.original - Math.round((extracted.orderTotal - extracted.salesTax - Math.abs(fee) - Math.abs(shipLbl||0) - Math.abs(extracted.otherFees||0)) * 100) / 100) <= 0.02;
+              }
+              if (zoomedTxnFee != null && Math.abs(zoomedTxnFee - origTxnFee) > 0.02 && earningsBalances(zoomedTxnFee, origShipLabel)){
+                extracted.transactionFees = zoomedTxnFee;
+                extracted.earningsConflict = null;
+              } else if (zoomedShipLabel != null && Math.abs(zoomedShipLabel - (origShipLabel||0)) > 0.02 && earningsBalances(origTxnFee, zoomedShipLabel)){
+                extracted.shippingLabelCost = zoomedShipLabel;
+                extracted.earningsConflict = null;
+              } else {
+                // No single fee re-read explains it either — the zoom's agreement with the
+                // original stands as the best available evidence; trust it (orderEarnings is
+                // already the original value) and clear the conflict rather than leave a flag
+                // when an independent, magnified read backs up what's already shown.
+                extracted.earningsConflict = null;
+              }
             }
-            // Agrees with neither (or, in principle, somehow both) — still genuinely
-            // ambiguous; leave earningsConflict in place for a human to settle by eye.
+            // Agrees with neither original nor computed — still genuinely ambiguous even
+            // after a third independent read; leave earningsConflict in place.
           }
         }
+      }
+
+      // Payment breakdown (Subtotal/Shipping/Sales tax/Order total): fully automated
+      // resolution instead of asking a human, by finding WHICH single field's own independent
+      // magnified re-read actually explains the discrepancy — this is what should have caught
+      // the real bug directly (Shipping misread as "$1.94" instead of "$11.94") instead of
+      // just detecting that SOMETHING was off. Re-reads Subtotal, Shipping, and Sales tax each
+      // from their own line (Order total is left alone — it already appears twice on the page
+      // independently, so it's the least likely of the four to be the actual culprit), then
+      // tries substituting each candidate's zoomed value one at a time to see which single
+      // substitution makes "Order total = Subtotal + Shipping + Sales tax" balance again.
+      if (extracted && extracted.subtotalConflict){
+        scanState = { active:true, label:"Zooming in on the payment breakdown for a cleaner read…" };
+        render();
+        var payLines = flattenLines(resultA.data);
+        function findMoneyLineBbox(labelRe){
+          for (var pli=0; pli<payLines.length; pli++){ if (labelRe.test(payLines[pli].text||"")) return payLines[pli].bbox; }
+          return null;
+        }
+        var subtotalBbox = findMoneyLineBbox(/Subtotal\b/i);
+        var shippingBbox = findMoneyLineBbox(/Shipping\b(?!\s*label)/i);
+        var salesTaxBbox = findMoneyLineBbox(/Sales tax/i);
+
+        var zoomedSubtotal = subtotalBbox ? await zoomField(subtotalBbox, 5, function(r){ return r.subtotalRaw; }) : null;
+        var zoomedShipping = shippingBbox ? await zoomField(shippingBbox, 5, function(r){ return r.shippingChargedToBuyer; }) : null;
+        var zoomedSalesTax = salesTaxBbox ? await zoomField(salesTaxBbox, 5, function(r){ return r.salesTax; }) : null;
+
+        var breakdownResult = findBreakdownCulprit(
+          { subtotal: extracted.subtotalConflict.original, shipping: extracted.shippingChargedToBuyer, salesTax: extracted.salesTax },
+          { subtotal: zoomedSubtotal, shipping: zoomedShipping, salesTax: zoomedSalesTax },
+          extracted.orderTotal
+        );
+        if (breakdownResult.resolved){
+          if (breakdownResult.culprit){
+            var culprit = breakdownResult.culprit;
+            if (culprit.field === "shipping") extracted.shippingChargedToBuyer = culprit.value;
+            else if (culprit.field === "salesTax") extracted.salesTax = culprit.value;
+            else if (culprit.field === "subtotal") extracted.subtotal = culprit.value;
+          }
+          extracted.subtotalConflict = null;
+        }
+        // Otherwise: genuinely irreducible ambiguity even after independently re-reading
+        // every candidate field. Leave the conflict flag in place; this should now be rare.
       }
     } catch(e){
       console.warn("OCR failed", e);
