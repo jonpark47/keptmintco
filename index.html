@@ -2514,10 +2514,15 @@
                 extracted.shippingLabelCost = zoomedShipLabel;
                 extracted.earningsConflict = null;
               } else {
-                // No single fee re-read explains it either — the zoom's agreement with the
-                // original stands as the best available evidence; trust it (orderEarnings is
-                // already the original value) and clear the conflict rather than leave a flag
-                // when an independent, magnified read backs up what's already shown.
+                // No single fee re-read explains it either. The zoom agreeing with the original
+                // is NOT strong evidence here — magnifying a crop can't recover a digit the
+                // camera/compression never captured in the first place, so a digit-loss misread
+                // (e.g. "$1.64" for "$11.64") reproduces itself under zoom every time. The
+                // computed value has no such failure mode: it's independent arithmetic over
+                // fields that (by construction of reaching this branch) aren't the culprit.
+                // Default to trusting computed rather than silently keeping an unconfirmed
+                // original with the flag cleared.
+                extracted.orderEarnings = conflict.computed;
                 extracted.earningsConflict = null;
               }
             }
