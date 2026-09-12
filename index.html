@@ -2301,8 +2301,28 @@
     try {
       uploaded = await assetsCap.upload(file);
     } catch(e){
-      toast("Couldn't store that screenshot ("+(e&&e.code||"error")+")");
-      return;
+      // "storage/unauthorized" here means Firebase Storage rejected the request as
+      // unauthenticated — seen in practice on mobile Safari, where the anonymous auth session
+      // established at page load can go stale (e.g. under Private Browsing's restricted
+      // IndexedDB, the SDK's background token refresh can silently fail) even though the app
+      // still believes it's connected. Since this tracker's data isn't gated by WHICH anonymous
+      // identity is signed in (confirmed: a brand new anon session reads the exact same shared
+      // Firestore data), a fresh sign-in costs nothing and safely self-heals a dead session —
+      // so retry once automatically instead of just telling the user to go fix it themselves.
+      if (e && e.code === "storage/unauthorized"){
+        try {
+          await firebase.auth().signOut();
+          var freshCred = await firebase.auth().signInAnonymously();
+          assetsCap = makeStorageAdapter(firebase.storage(), freshCred.user.uid);
+          uploaded = await assetsCap.upload(file);
+        } catch(e2){
+          toast("Couldn't store that screenshot ("+(e2&&e2.code||"error")+") — try reloading the page.");
+          return;
+        }
+      } else {
+        toast("Couldn't store that screenshot ("+(e&&e.code||"error")+")");
+        return;
+      }
     }
 
     scanState = { active:true, label:"Starting OCR engine…" };
