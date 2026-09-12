@@ -2465,69 +2465,70 @@
       // the directly-read value and the orderTotal-minus-fees computed value already disagree
       // and NEITHER was auto-trusted (see where earningsConflict is set — the computed side
       // isn't presumed correct anymore, since its own inputs can carry the same dropped-digit
-      // error). This zoom pass acts as a genuine THIRD, independent vote to help settle that:
-      // a magnified re-read of just the "Order earnings" line, compared against both the
-      // original and the computed figures.
+      // error).
+      //
+      // A magnified re-read of the "Order earnings" line itself turned out NOT to be a reliable
+      // tie-breaker: on the exact real order this whole mechanism was built around, the direct
+      // read came back "$1.64" and a 5x zoom of the SAME line came back "$10.64" — a third,
+      // still-wrong value that matched neither the original nor the computed figure. Magnifying
+      // a crop can't recover a digit the source image never captured; it just gives OCR another
+      // chance to misread the same degraded pixels differently. So this line's own zoom is used
+      // only as a fast path (skip straight to computed if it happens to confirm computed) — it
+      // is never treated as evidence FOR the original, and never blocks resolution when it comes
+      // back matching neither side.
+      //
+      // The real, reliable check is verifying the COMPUTED side's own inputs instead: Transaction
+      // fees and Shipping label cost are each independently OCR'd from their own clearly-labeled
+      // line, so a magnified re-read of THOSE (larger, cleaner text than the tiny earnings
+      // figure) can actually catch it if one of them — not "Order earnings" — was the real
+      // culprit. If both fees check out clean, computed has no demonstrated defect while the
+      // direct "Order earnings" read is the one field proven unreliable at both normal AND
+      // magnified resolution — so computed wins outright, automatically, no flag left behind.
       if (extracted && extracted.earningsConflict){
+        var conflict = extracted.earningsConflict;
+        scanState = { active:true, label:"Zooming in on Order earnings for a cleaner read…" };
+        render();
         var earningsLines = flattenLines(resultA.data);
         var earningsBbox = null;
         for (var eli=0; eli<earningsLines.length; eli++){
           if (/Order earnings/i.test(earningsLines[eli].text||"")){ earningsBbox = earningsLines[eli].bbox; break; }
         }
-        if (earningsBbox){
-          scanState = { active:true, label:"Zooming in on Order earnings for a cleaner read…" };
+        var zoomedEarnings = earningsBbox ? await zoomField(earningsBbox, 5, function(r){ return r.orderEarningsRaw; }) : null;
+        var agreesWithComputed = zoomedEarnings != null && Math.abs(zoomedEarnings - conflict.computed) <= 0.02;
+
+        if (agreesWithComputed){
+          extracted.orderEarnings = conflict.computed;
+          extracted.earningsConflict = null;
+        } else {
+          scanState = { active:true, label:"Zooming in on selling costs for a cleaner read…" };
           render();
-          var zoomedEarnings = await zoomField(earningsBbox, 5, function(r){ return r.orderEarningsRaw; });
-          if (zoomedEarnings != null){
-            var conflict = extracted.earningsConflict;
-            var agreesWithComputed = Math.abs(zoomedEarnings - conflict.computed) <= 0.02;
-            var agreesWithOriginal = Math.abs(zoomedEarnings - conflict.original) <= 0.02;
-            if (agreesWithComputed && !agreesWithOriginal){
-              // Two independent signals (the math, and a fresh magnified OCR read) agree with
-              // each other and disagree with the original full-page read — that's a real
-              // majority, safe to resolve in favor of the computed value now.
-              extracted.orderEarnings = conflict.computed;
-              extracted.earningsConflict = null;
-            } else if (agreesWithOriginal && !agreesWithComputed){
-              // The zoom backs up the ORIGINAL reading over the computed one — same
-              // "find the actual culprit" idea as the payment-breakdown check below: check
-              // whether Transaction fees or Shipping label cost (the two single-read, no
-              // redundancy inputs feeding the computed formula) was itself misread, by trying
-              // each one's own independent magnified re-read as the one thing that changed.
-              var feeLines = flattenLines(resultA.data);
-              function findFeeLineBbox(labelRe){
-                for (var fli=0; fli<feeLines.length; fli++){ if (labelRe.test(feeLines[fli].text||"")) return feeLines[fli].bbox; }
-                return null;
-              }
-              var txnFeeBbox = findFeeLineBbox(/Transaction fees/i);
-              var shipLabelBbox = findFeeLineBbox(/Shipping label/i);
-              var zoomedTxnFee = txnFeeBbox ? await zoomField(txnFeeBbox, 5, function(r){ return r.transactionFees; }) : null;
-              var zoomedShipLabel = shipLabelBbox ? await zoomField(shipLabelBbox, 5, function(r){ return r.shippingLabelCost; }) : null;
-              var origTxnFee = extracted.transactionFees, origShipLabel = extracted.shippingLabelCost;
-              function earningsBalances(fee, shipLbl){
-                return Math.abs(conflict.original - Math.round((extracted.orderTotal - extracted.salesTax - Math.abs(fee) - Math.abs(shipLbl||0) - Math.abs(extracted.otherFees||0)) * 100) / 100) <= 0.02;
-              }
-              if (zoomedTxnFee != null && Math.abs(zoomedTxnFee - origTxnFee) > 0.02 && earningsBalances(zoomedTxnFee, origShipLabel)){
-                extracted.transactionFees = zoomedTxnFee;
-                extracted.earningsConflict = null;
-              } else if (zoomedShipLabel != null && Math.abs(zoomedShipLabel - (origShipLabel||0)) > 0.02 && earningsBalances(origTxnFee, zoomedShipLabel)){
-                extracted.shippingLabelCost = zoomedShipLabel;
-                extracted.earningsConflict = null;
-              } else {
-                // No single fee re-read explains it either. The zoom agreeing with the original
-                // is NOT strong evidence here — magnifying a crop can't recover a digit the
-                // camera/compression never captured in the first place, so a digit-loss misread
-                // (e.g. "$1.64" for "$11.64") reproduces itself under zoom every time. The
-                // computed value has no such failure mode: it's independent arithmetic over
-                // fields that (by construction of reaching this branch) aren't the culprit.
-                // Default to trusting computed rather than silently keeping an unconfirmed
-                // original with the flag cleared.
-                extracted.orderEarnings = conflict.computed;
-                extracted.earningsConflict = null;
-              }
-            }
-            // Agrees with neither original nor computed — still genuinely ambiguous even
-            // after a third independent read; leave earningsConflict in place.
+          var feeLines = flattenLines(resultA.data);
+          function findFeeLineBbox(labelRe){
+            for (var fli=0; fli<feeLines.length; fli++){ if (labelRe.test(feeLines[fli].text||"")) return feeLines[fli].bbox; }
+            return null;
+          }
+          var txnFeeBbox = findFeeLineBbox(/Transaction fees/i);
+          var shipLabelBbox = findFeeLineBbox(/Shipping label/i);
+          var zoomedTxnFee = txnFeeBbox ? await zoomField(txnFeeBbox, 5, function(r){ return r.transactionFees; }) : null;
+          var zoomedShipLabel = shipLabelBbox ? await zoomField(shipLabelBbox, 5, function(r){ return r.shippingLabelCost; }) : null;
+          var origTxnFee = extracted.transactionFees, origShipLabel = extracted.shippingLabelCost;
+          function earningsBalances(fee, shipLbl){
+            return Math.abs(conflict.original - Math.round((extracted.orderTotal - extracted.salesTax - Math.abs(fee) - Math.abs(shipLbl||0) - Math.abs(extracted.otherFees||0)) * 100) / 100) <= 0.02;
+          }
+          if (zoomedTxnFee != null && Math.abs(zoomedTxnFee - origTxnFee) > 0.02 && earningsBalances(zoomedTxnFee, origShipLabel)){
+            // Transaction fees was the actual culprit — correcting it brings computed back in
+            // line with the original direct read, so the original earnings figure was right.
+            extracted.transactionFees = zoomedTxnFee;
+            extracted.earningsConflict = null;
+          } else if (zoomedShipLabel != null && Math.abs(zoomedShipLabel - (origShipLabel||0)) > 0.02 && earningsBalances(origTxnFee, zoomedShipLabel)){
+            extracted.shippingLabelCost = zoomedShipLabel;
+            extracted.earningsConflict = null;
+          } else {
+            // Both fee inputs check out clean under magnification — computed has no
+            // demonstrated defect. Trust it over the direct "Order earnings" read, which is the
+            // one field this entire mechanism exists because of.
+            extracted.orderEarnings = conflict.computed;
+            extracted.earningsConflict = null;
           }
         }
       }
