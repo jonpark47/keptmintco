@@ -989,25 +989,31 @@
     var salesTax = money(valueAfter(/Sales tax/i, /\$?[\d,]+\.\d{2}/));
     var orderTotal = money(valueAfter(/Order total/i, /\$?[\d,]+\.\d{2}/));
 
-    // Cross-check Subtotal the same way "Order earnings" already gets cross-checked below —
-    // same root problem, same fix, applied to the one other dollar field that had NO redundant
-    // check at all. Confirmed real: "Subtotal $20.00" OCR'd as "0.00" (a dropped leading
-    // digit, the same failure class as the earlier "$115.75"->"$15.75" earnings bug), and
-    // since the digits themselves genuinely formed a valid "0.00" money value, no format/regex
-    // fix could ever catch it — the text wasn't malformed, it was just wrong. Order total is
-    // effectively self-verifying already (it's independently OCR'd from TWO separate places on
-    // this page — "What your buyer paid" and "What you earned" both show it), so it's the most
-    // trustworthy of the four figures in "Order total = Subtotal + Shipping + Sales tax" to
-    // solve the equation FROM — when shipping/sales tax/order total are all present, recompute
-    // subtotal from them and prefer that over a directly-read value that disagrees with it.
+    // Cross-check Subtotal against "Order total = Subtotal + Shipping + Sales tax" — but
+    // NOT by blindly trusting orderTotal/shipping/salesTax and overwriting whatever Subtotal
+    // already says. First shipped that way (auto-correct whenever they disagreed) and it
+    // backfired on the very next real multi-item order: Shipping itself had the identical
+    // dropped-leading-digit misread ("$11.94" OCR'd as "$1.94"), and the "correction" used
+    // that wrong shipping value to silently overwrite an ALREADY-CORRECT Subtotal ($79.98)
+    // with a wrong one ($89.98). The inputs this check leans on are not immune to the exact
+    // failure it exists to catch — Shipping in particular is read from only ONE place on the
+    // page, unlike Order total and Sales tax which each appear twice (buyer-paid and
+    // earnings sections), so it has no redundancy of its own to lean on.
+    //
+    // Policy now matches every other "two independent numbers disagree" case already fixed
+    // this session (order #, item ID, net profit): fill in the computed value ONLY when
+    // Subtotal is missing outright (nothing to lose there); when a real value is ALREADY
+    // present and disagrees with the computed one, that's a genuine ambiguity where either
+    // side could be the wrong one — surface it, don't silently pick.
     var subtotalRaw = subtotal;
-    var subtotalWasCorrected = false;
     var subtotalComputed = null;
+    var subtotalConflict = null;
     if (orderTotal!=null && shippingChargedToBuyer!=null && salesTax!=null){
       subtotalComputed = Math.round((orderTotal - shippingChargedToBuyer - salesTax) * 100) / 100;
-      if (subtotal==null || Math.abs(subtotal - subtotalComputed) > 0.02){
-        subtotalWasCorrected = subtotal != null;
+      if (subtotal==null){
         subtotal = subtotalComputed;
+      } else if (Math.abs(subtotal - subtotalComputed) > 0.02){
+        subtotalConflict = { original: subtotal, computed: subtotalComputed };
       }
     }
 
@@ -1057,16 +1063,26 @@
     // of it in isolation. This line sits right next to a small thumbnail/details link and is
     // the single most consequential number on the page (it becomes the suggested net profit),
     // so a lone dropped digit here (e.g. "$115.75" misread as "$15.75") must never reach the
-    // review modal unnoticed. Order total / sales tax / transaction fees are each independently
-    // OCR'd from their own clearly-labeled line, so when all three are present, recompute
-    // earnings from them and prefer that over a directly-read value that disagrees with it.
-    var earningsWasCorrected = false;
+    // review modal unnoticed. Order total / sales tax are each independently OCR'd from their
+    // own clearly-labeled line AND each appear a second time elsewhere on the page (buyer-paid
+    // vs earnings sections), giving them real redundancy — but transactionFees/
+    // shippingLabelCost/otherFees are each read from only ONE place, same as Shipping was on
+    // the Subtotal check above, and Shipping just proved that a single-read field CAN carry
+    // the exact dropped-digit error this whole check exists to catch. Auto-correcting a
+    // PRESENT orderEarnings value from a formula that includes those same single-read fields
+    // carries the identical risk of silently overwriting an already-correct number — so this
+    // no longer auto-fills over an existing value, only when Order earnings is missing
+    // outright (nothing to lose there). A present-but-disagreeing pair is surfaced as a
+    // conflict instead, same policy as Subtotal now uses and every other "two independent
+    // reads disagree" case fixed this session.
     var earningsComputed = null;
+    var earningsConflict = null;
     if (orderTotal!=null && salesTax!=null && transactionFees!=null){
       earningsComputed = Math.round((orderTotal - salesTax - Math.abs(transactionFees) - Math.abs(shippingLabelCost||0) - Math.abs(otherFees||0)) * 100) / 100;
-      if (orderEarnings==null || Math.abs(orderEarnings - earningsComputed) > 0.02){
-        earningsWasCorrected = orderEarnings != null;
+      if (orderEarnings==null){
         orderEarnings = earningsComputed;
+      } else if (Math.abs(orderEarnings - earningsComputed) > 0.02){
+        earningsConflict = { original: orderEarnings, computed: earningsComputed };
       }
     }
 
@@ -1338,8 +1354,8 @@
       itemTitleLowAgreement: itemTitleLowAgreement,
       subtotal: subtotal,
       subtotalRaw: subtotalRaw,
-      subtotalWasCorrected: subtotalWasCorrected,
       subtotalComputed: subtotalComputed,
+      subtotalConflict: subtotalConflict,
       shippingChargedToBuyer: shippingChargedToBuyer,
       salesTax: salesTax,
       orderTotal: orderTotal,
@@ -1349,7 +1365,7 @@
       discount: discount,
       orderEarnings: orderEarnings,
       orderEarningsRaw: orderEarningsRaw,
-      earningsWasCorrected: earningsWasCorrected,
+      earningsConflict: earningsConflict,
       earningsComputed: earningsComputed,
       fundsStatus: fundsStatus,
       alerts: alerts,
@@ -1410,12 +1426,13 @@
       if (extracted.itemIdZoomConflict){
         flag("item", "warn", "Item ID has two disagreeing reads: the original (\""+extracted.itemIdZoomConflict.original+"\") and a zoomed-in re-read (\""+extracted.itemIdZoomConflict.zoomed+"\"). Since this is an exact-match product key, worth a glance against the screenshot — but a disagreement here doesn't necessarily mean the displayed one is wrong.");
       }
-      // Same "auto-corrected, tell the truth about it" pattern as Order earnings above —
-      // confirmed real: "Subtotal $20.00" OCR'd as "0.00" (a dropped leading digit forming a
-      // still-valid money value, so no format check could ever catch it), silently propagating
-      // into a $0.00 Sold price with no warning at all until this cross-check existed.
-      if (extracted.subtotalWasCorrected){
-        flag("item", "warn", "Sold price was auto-corrected from the OCR'd \"Subtotal\" value ($"+extracted.subtotalRaw.toFixed(2)+") to $"+extracted.subtotal.toFixed(2)+" because it didn't reconcile with Order total minus shipping and sales tax. Double-check against the screenshot.");
+      // Flag-not-overwrite: a real disagreement between the directly-read Subtotal and the
+      // one computed from Order total/Shipping/Sales tax — NOT auto-corrected, since Shipping
+      // itself has shown the same dropped-digit misread this check exists to catch, which
+      // once made this exact mechanism overwrite an ALREADY-CORRECT Subtotal with a wrong
+      // computed one. Neither side is presumed right; surfaced for a human to settle by eye.
+      if (extracted.subtotalConflict){
+        flag("item", "warn", "Sold price is ambiguous: the OCR'd \"Subtotal\" ($"+extracted.subtotalConflict.original.toFixed(2)+") doesn't reconcile with Order total minus shipping and sales tax ($"+extracted.subtotalConflict.computed.toFixed(2)+"). Either could be the wrong one — check against the screenshot before saving.");
       }
     }
 
@@ -1428,23 +1445,18 @@
       flag("orderNumber", "warn", "Order # has two disagreeing reads: the original (\""+extracted.orderNumberZoomConflict.original+"\") and a zoomed-in re-read (\""+extracted.orderNumberZoomConflict.zoomed+"\"). Worth a glance — but a disagreement here doesn't necessarily mean the displayed one is wrong.");
     }
 
-    if (extracted.earningsZoomConflict){
-      // Downgraded from "error" to "warn" 2026-09-12 after real evidence: this flag fires
-      // when a zoomed-in re-read of "Order earnings" agrees with the ORIGINAL (uncorrected)
-      // OCR value instead of the computed one — originally kept as a hard "error" specifically
-      // because net profit is the single most consequential field, on the theory that the zoom
-      // agreeing with the original read might mean the computed "correction" is the wrong one.
-      // But on two separate real orders where this fired, the computed value was confirmed
-      // correct both times, and the zoom simply hit the exact same missing-pixel/digit-loss
-      // problem the original read did (magnification can't recover a digit that was never
-      // captured in the screenshot). The computed value is still what's shown/proposed either
-      // way — this flag was already advisory, not a value override — so "error" overstated the
-      // actual risk given what's now been observed twice. Kept as a flag at all (not removed
-      // entirely) since a genuine case where the computed value IS the wrong one is still
-      // possible in principle, just not yet seen.
-      flag("orderEarnings", "warn", "Net profit has two disagreeing reads: a zoomed-in re-read of \"Order earnings\" ($"+extracted.earningsZoomValue.toFixed(2)+") agrees with the original OCR value, not the computed one ($"+extracted.orderEarnings.toFixed(2)+") shown here. Worth a glance against the screenshot — but on similar cases so far, the computed value has been the correct one.");
-    } else if (extracted.earningsWasCorrected){
-      flag("orderEarnings", "warn", "Net profit was auto-corrected from the OCR'd \"Order earnings\" value ($"+extracted.orderEarningsRaw.toFixed(2)+") to $"+extracted.orderEarnings.toFixed(2)+" because it didn't reconcile with Order total minus fees. Double-check against the screenshot.");
+    // Flag-not-overwrite, same policy as Subtotal now uses: `earningsConflict` means the
+    // directly-read "Order earnings" and the orderTotal-minus-fees computed value disagreed,
+    // and the zoom pass (see scanScreenshot) either couldn't settle which one to trust or
+    // hasn't run yet — orderEarnings stays at the ORIGINAL directly-read value in this case
+    // (never silently overwritten by the computed one), so this flag is the only place either
+    // number surfaces. Removed the old auto-correct-then-flag-if-zoom-disagrees design after
+    // it silently overwrote an already-correct Subtotal on a real order, once one of the
+    // "trusted" inputs (Shipping) turned out to carry the same dropped-digit error — Order
+    // earnings' computed value leans on transaction fees / shipping label cost, which are
+    // exactly as single-read and exactly as exposed to that failure mode.
+    if (extracted.earningsConflict){
+      flag("orderEarnings", "warn", "Net profit is ambiguous: the OCR'd \"Order earnings\" ($"+extracted.earningsConflict.original.toFixed(2)+") doesn't reconcile with Order total minus fees ($"+extracted.earningsConflict.computed.toFixed(2)+"). Either could be the wrong one — check against the screenshot before saving.");
     }
     if (extracted.orderEarnings != null && extracted.orderEarnings < 0){
       flag("orderEarnings", "error", "Net profit computed as negative ($"+extracted.orderEarnings.toFixed(2)+") — fees may have been misread.");
@@ -2412,14 +2424,14 @@
         }
       }
 
-      // Net profit: the single most consequential field on the page. It already has a strong
-      // safety net (the earnings-vs-orderTotal-minus-fees cross-check above) — this zoom pass
-      // exists for the cases that check can't fully resolve on its own: a genuine three-way
-      // reconciliation between the raw OCR read of "Order earnings" itself, the computed
-      // value, and now a THIRD, independently re-read value from a magnified crop of just
-      // that line. Only run when the cross-check already disagreed with the direct read (a
-      // clean, already-agreeing read has nothing left to double-check).
-      if (extracted && extracted.earningsWasCorrected){
+      // Net profit: the single most consequential field on the page. `earningsConflict` means
+      // the directly-read value and the orderTotal-minus-fees computed value already disagree
+      // and NEITHER was auto-trusted (see where earningsConflict is set — the computed side
+      // isn't presumed correct anymore, since its own inputs can carry the same dropped-digit
+      // error). This zoom pass acts as a genuine THIRD, independent vote to help settle that:
+      // a magnified re-read of just the "Order earnings" line, compared against both the
+      // original and the computed figures.
+      if (extracted && extracted.earningsConflict){
         var earningsLines = flattenLines(resultA.data);
         var earningsBbox = null;
         for (var eli=0; eli<earningsLines.length; eli++){
@@ -2428,28 +2440,25 @@
         if (earningsBbox){
           scanState = { active:true, label:"Zooming in on Order earnings for a cleaner read…" };
           render();
-          // Pull the crop's own DIRECT read (orderEarningsRaw), not its "corrected" value —
-          // the crop's isolated text has no orderTotal/salesTax/fees to cross-check against,
-          // so its own cross-check is a no-op and orderEarnings/orderEarningsRaw end up equal
-          // anyway; naming the raw one explicitly keeps that intent clear either way.
           var zoomedEarnings = await zoomField(earningsBbox, 5, function(r){ return r.orderEarningsRaw; });
           if (zoomedEarnings != null){
-            var agreesWithComputed = Math.abs(zoomedEarnings - extracted.orderEarnings) <= 0.02;
-            var agreesWithOriginalRead = extracted.orderEarningsRaw != null && Math.abs(zoomedEarnings - extracted.orderEarningsRaw) <= 0.02;
-            // Deliberately NOT auto-resolved either way: if the zoomed re-read agrees with the
-            // ORIGINAL OCR read rather than the computed value, that's real evidence the
-            // computed "correction" might be the wrong one this time (one of ITS inputs could
-            // be the actual misread) — but it's just as possible the zoom re-read hit the
-            // exact same missing-pixel-data problem the original read did (magnification
-            // resolves blur, not information that was never captured in the image at all), in
-            // which case reverting would silently reintroduce the exact digit-loss bug this
-            // cross-check exists to catch. Given how consequential this field is, surfacing
-            // the conflict for Jon to look at beats guessing which of two disagreeing OCR
-            // reads to trust.
-            if (!agreesWithComputed && agreesWithOriginalRead){
-              extracted.earningsZoomConflict = true;
-              extracted.earningsZoomValue = zoomedEarnings;
+            var conflict = extracted.earningsConflict;
+            var agreesWithComputed = Math.abs(zoomedEarnings - conflict.computed) <= 0.02;
+            var agreesWithOriginal = Math.abs(zoomedEarnings - conflict.original) <= 0.02;
+            if (agreesWithComputed && !agreesWithOriginal){
+              // Two independent signals (the math, and a fresh magnified OCR read) agree with
+              // each other and disagree with the original full-page read — that's a real
+              // majority, safe to resolve in favor of the computed value now.
+              extracted.orderEarnings = conflict.computed;
+              extracted.earningsConflict = null;
+            } else if (agreesWithOriginal && !agreesWithComputed){
+              // The zoom instead backs up the ORIGINAL reading — evidence one of the fee/tax
+              // inputs feeding the computed formula was itself misread. orderEarnings is
+              // already the original value (never overwritten), so just clear the conflict.
+              extracted.earningsConflict = null;
             }
+            // Agrees with neither (or, in principle, somehow both) — still genuinely
+            // ambiguous; leave earningsConflict in place for a human to settle by eye.
           }
         }
       }
