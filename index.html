@@ -989,6 +989,28 @@
     var salesTax = money(valueAfter(/Sales tax/i, /\$?[\d,]+\.\d{2}/));
     var orderTotal = money(valueAfter(/Order total/i, /\$?[\d,]+\.\d{2}/));
 
+    // Cross-check Subtotal the same way "Order earnings" already gets cross-checked below —
+    // same root problem, same fix, applied to the one other dollar field that had NO redundant
+    // check at all. Confirmed real: "Subtotal $20.00" OCR'd as "0.00" (a dropped leading
+    // digit, the same failure class as the earlier "$115.75"->"$15.75" earnings bug), and
+    // since the digits themselves genuinely formed a valid "0.00" money value, no format/regex
+    // fix could ever catch it — the text wasn't malformed, it was just wrong. Order total is
+    // effectively self-verifying already (it's independently OCR'd from TWO separate places on
+    // this page — "What your buyer paid" and "What you earned" both show it), so it's the most
+    // trustworthy of the four figures in "Order total = Subtotal + Shipping + Sales tax" to
+    // solve the equation FROM — when shipping/sales tax/order total are all present, recompute
+    // subtotal from them and prefer that over a directly-read value that disagrees with it.
+    var subtotalRaw = subtotal;
+    var subtotalWasCorrected = false;
+    var subtotalComputed = null;
+    if (orderTotal!=null && shippingChargedToBuyer!=null && salesTax!=null){
+      subtotalComputed = Math.round((orderTotal - shippingChargedToBuyer - salesTax) * 100) / 100;
+      if (subtotal==null || Math.abs(subtotal - subtotalComputed) > 0.02){
+        subtotalWasCorrected = subtotal != null;
+        subtotal = subtotalComputed;
+      }
+    }
+
     // The small "Selling costs" deduction lines (Transaction fees / Other fees / Shipping
     // label) sit tightly packed next to each other and other fine print, and have twice now
     // been seen with the decimal point dropped entirely by OCR ("Transaction fees $4994",
@@ -1315,6 +1337,9 @@
       items: (itemTitle || itemId) ? [{ title: itemTitle, quantity: quantity, itemPrice: subtotal, itemTotal: subtotal, itemId: itemId }] : [],
       itemTitleLowAgreement: itemTitleLowAgreement,
       subtotal: subtotal,
+      subtotalRaw: subtotalRaw,
+      subtotalWasCorrected: subtotalWasCorrected,
+      subtotalComputed: subtotalComputed,
       shippingChargedToBuyer: shippingChargedToBuyer,
       salesTax: salesTax,
       orderTotal: orderTotal,
@@ -1384,6 +1409,13 @@
       // is the honest signal level given what this check can and can't actually tell.
       if (extracted.itemIdZoomConflict){
         flag("item", "warn", "Item ID has two disagreeing reads: the original (\""+extracted.itemIdZoomConflict.original+"\") and a zoomed-in re-read (\""+extracted.itemIdZoomConflict.zoomed+"\"). Since this is an exact-match product key, worth a glance against the screenshot — but a disagreement here doesn't necessarily mean the displayed one is wrong.");
+      }
+      // Same "auto-corrected, tell the truth about it" pattern as Order earnings above —
+      // confirmed real: "Subtotal $20.00" OCR'd as "0.00" (a dropped leading digit forming a
+      // still-valid money value, so no format check could ever catch it), silently propagating
+      // into a $0.00 Sold price with no warning at all until this cross-check existed.
+      if (extracted.subtotalWasCorrected){
+        flag("item", "warn", "Sold price was auto-corrected from the OCR'd \"Subtotal\" value ($"+extracted.subtotalRaw.toFixed(2)+") to $"+extracted.subtotal.toFixed(2)+" because it didn't reconcile with Order total minus shipping and sales tax. Double-check against the screenshot.");
       }
     }
 
