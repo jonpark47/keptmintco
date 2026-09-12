@@ -1555,7 +1555,19 @@
     cmp("orderNumber", "Order #");
     cmp("buyerName", "Buyer username");
     cmp("fundsStatus", "Funds status");
-    cmp("orderEarnings", "Net profit");
+    // Net profit is deliberately NOT compared here. Unlike the fields above, `a.orderEarnings`
+    // (from the main pass) has already been through a dedicated, strictly more rigorous
+    // verification pipeline by this point (see the earningsConflict zoom + fee-culprit-search
+    // logic in scanScreenshot) that cross-checks it against independently-read Order
+    // total/Sales tax/Transaction fees/Shipping label — real arithmetic, not just "did a second
+    // OCR pass happen to agree." `b` (the second pass) never goes through that same pipeline,
+    // so it's just raw, uncorrected OCR of the single most digit-loss-prone number on the page.
+    // Comparing a verified value against an unverified one produces exactly a false positive in
+    // the success case: confirmed for real on the canonical test order, where `a.orderEarnings`
+    // was correctly resolved to $11.64 but `b.orderEarnings` independently misread the same line
+    // as "$10.64" (yet a third distinct misread, on top of `a`'s own original "$1.64" and a
+    // zoomed re-read's "$10.64") — this comparison would have flagged "11.64 vs 10.64" as a
+    // disagreement even though 11.64 is already the verified, correct answer.
     // Title needs a WORD-OVERLAP comparison here, not exact match — unlike a username or a
     // dollar figure, which really should read identically on both passes when both are good,
     // a long title string picks up superficial OCR noise even when both passes clearly found
