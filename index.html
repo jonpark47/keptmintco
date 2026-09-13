@@ -308,7 +308,14 @@
        the standard mobile pattern instead: a plain header (just the brand) up top, and a fixed
        bottom tab bar with every tab visible and reachable in one tap, no scrolling, no hidden
        affordance to discover. */
-    .nav{ flex-direction:row; align-items:center; border-right:none; border-bottom:1px solid var(--border); padding:14px 16px; }
+    /* .nav's base rule sets flex:0 0 216px to fix its WIDTH as a sidebar when .shell lays out
+       as a row (desktop). Once .shell switches to flex-direction:column below, that same
+       flex-basis applies to the vertical axis instead — silently forcing .nav to a fixed 216px
+       HEIGHT with its one small brand row centered inside all that leftover space. This was the
+       actual cause of the large empty gap above and below the logo that Jon flagged; a missing
+       override, not a Safari-specific rendering quirk (reproduced identically here in Chromium
+       once actually measured, not just eyeballed). */
+    .nav{ flex:0 0 auto; flex-direction:row; align-items:center; border-right:none; border-bottom:1px solid var(--border); padding:14px 16px; }
     .brand{ padding:0; }
     .navtabs, .nav-foot{ display:none; }
     .bottom-tabbar{
