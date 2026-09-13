@@ -2018,9 +2018,16 @@
   }
 
   function renderInventory(){
-    var html = "<div class='section-head'><h2>Products</h2><button class='btn primary' data-action='open-add-product'><span class='ic' data-icon='plus'></span> Add item</button></div>";
+    // No manual "Add item" here on purpose: a hand-typed product name (e.g. "Ascended Heroes
+    // Tin Pack") almost never matches the real, SEO-stuffed eBay listing title that later gets
+    // OCR'd off an order screenshot ("Pokemon Ascended Heroes Mega Evolutions Tin Pack 4 Packs
+    // Included") closely enough for matchProduct()'s fuzzy word-overlap check to link them —
+    // which used to silently create a duplicate product instead of matching the existing one.
+    // Scanning an order is now the ONLY way a product gets created, so every product's name is
+    // always the real listing title, and later scans of the same listing keep matching cleanly.
+    var html = "<div class='section-head'><h2>Products</h2></div>";
     if (!state.products.length){
-      html += "<div class='card empty'><div class='ic' data-icon='box'></div>No items yet — add the first thing you and Jax are flipping.</div>";
+      html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — scan an order from the Orders tab and this fills in automatically.</div>";
       return html;
     }
     state.products.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).forEach(function(p){
@@ -2223,22 +2230,6 @@
   }
   function statusOptions(selected){
     return ["preorder","transit","received"].map(function(s){ return "<option value='"+s+"'"+(s===selected?" selected":"")+">"+STATUS_LABEL[s]+"</option>"; }).join("");
-  }
-
-  function openAddProductModal(){
-    openModal("Add item",
-      "<div class='field'><label>Item name</label><input id='f_name' type='text' placeholder='e.g. Charizard ex Booster Box' required></div>"+
-      "<div class='field'><label>Category</label><input id='f_cat' list='catList' value='"+esc(CATS[0])+"'><datalist id='catList'>"+CATS.map(function(c){return "<option value='"+esc(c)+"'>";}).join("")+"</datalist></div>"+
-      "<hr style='border:none;border-top:1px solid var(--border);'>"+
-      "<div class='hint'>Add the first purchase batch now (you can add more owners/batches later).</div>"+
-      "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(whoAmI)+"</select></div>"+
-      "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='1'></div></div>"+
-      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00'></div>"+
-      "<div class='field'><label>Status</label><select id='f_status'>"+statusOptions("preorder")+"</select></div></div>"+
-      "<div class='field'><label>Expected arrival (if not received)</label><input id='f_arrival' type='date'></div>"+
-      "<div class='field'><label>Note</label><textarea id='f_note' placeholder='Optional'></textarea></div>",
-      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-add-product'>Add item</button>"
-    );
   }
 
   function openAddBatchModal(productId){
@@ -2872,7 +2863,6 @@
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
 
-    if (action==="open-add-product") return openAddProductModal();
     if (action==="open-add-batch") return openAddBatchModal(t.dataset.product);
     if (action==="edit-batch") return openEditBatchModal(t.dataset.id);
     if (action==="open-add-sale") return openAddSaleModal(t.dataset.product||null);
@@ -2908,26 +2898,6 @@
       return;
     }
 
-    if (action==="submit-add-product"){
-      var name = $("#f_name").value.trim();
-      if (!name){ toast("Item name is required"); return; }
-      addProduct({ name: name, category: $("#f_cat").value.trim() || "Other" }).then(function(ref){
-        var pid = ref && ref.id ? ref.id : ref;
-        var qty = Number($("#f_qty").value)||1;
-        if (qty>0){
-          addBatch({
-            productId: pid, owner: $("#f_owner").value, quantity: qty,
-            unitCost: Number($("#f_cost").value)||0, status: $("#f_status").value,
-            expectedArrival: $("#f_arrival").value || null,
-            receivedDate: $("#f_status").value==="received" ? todayISO() : null,
-            note: $("#f_note").value.trim(), needsReview:false
-          });
-        }
-        toast("Item added");
-      });
-      closeModal();
-      return;
-    }
 
     if (action==="submit-add-batch"){
       addBatch({
