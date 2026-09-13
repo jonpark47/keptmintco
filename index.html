@@ -1951,7 +1951,7 @@
     var n = needsReviewBatches().length;
     var b = $("#reviewBanner");
     if (!n){ b.innerHTML=""; return; }
-    b.innerHTML = "<div class='banner'><span class='ic' data-icon='warning'></span><span>"+n+" item"+(n>1?"s":"")+" migrated from the old tracker need"+(n>1?"":"s")+" an owner confirmed.</span>"+
+    b.innerHTML = "<div class='banner'><span class='ic' data-icon='warning'></span><span>"+n+" batch"+(n>1?"es":"")+" "+(n>1?"were":"was")+" auto-added to cover a sale and need"+(n>1?"":"s")+" a real purchase cost filled in (defaulted to $0).</span>"+
       "<button data-action='goto-inventory'>Review in Inventory</button></div>";
   }
 
