@@ -1819,6 +1819,38 @@
     state.sales.forEach(function(s){ if(s.productId===productId) sold += Number(s.quantitySold||0); });
     return { received: received, pipeline: pipeline, sold: sold, remaining: received - sold };
   }
+  // Auto-covers a sale against inventory instead of ever letting "On hand" go negative. Jon's
+  // real workflow is scan-the-sale-first, no separate purchase-batch entry — which meant every
+  // product's stock count was permanently wrong (negative "On hand") because nothing had ever
+  // been logged as received. Rather than requiring a second manual step every time, this treats
+  // "I sold N of these" as proof that at least N were physically in hand: whenever a sale is
+  // saved, recompute the product's total received vs. total sold (INCLUDING this sale) and, if
+  // sold now exceeds received, auto-create a batch for exactly the shortfall so the books
+  // balance to zero (never negative) instead of drifting further under. The owner is taken from
+  // the sale's own "Goes to" field (the best signal available for who actually had the stock,
+  // mirroring how suggestOwner() already uses batch ownership to guess sale ownership in the
+  // OTHER direction), unit cost defaults to $0 since it's genuinely unknown, and needsReview is
+  // set so it surfaces in the existing "needs review" banner/badge — this auto-fill is a
+  // placeholder for real batch data, not a claim that the item was actually free.
+  // `excludeSaleId` lets an edit recompute cleanly by not double-counting the sale's own old
+  // quantity against itself.
+  function syncStockForSale(productId, quantitySold, attributedTo, saleDate, excludeSaleId){
+    if (!productId) return Promise.resolve();
+    var totalSold = Number(quantitySold||0);
+    state.sales.forEach(function(s){
+      if (s.productId === productId && s.id !== excludeSaleId) totalSold += Number(s.quantitySold||0);
+    });
+    var totalReceived = 0;
+    state.batches.forEach(function(b){ if (b.productId === productId && b.status === "received") totalReceived += Number(b.quantity||0); });
+    var shortfall = totalSold - totalReceived;
+    if (shortfall <= 0) return Promise.resolve();
+    return addBatch({
+      productId: productId, owner: attributedTo || whoAmI, quantity: shortfall, unitCost: 0,
+      status: "received", receivedDate: saleDate || todayISO(),
+      note: "Auto-added to cover a sale — unit cost unknown, edit with the real purchase cost if you have it.",
+      needsReview: true
+    });
+  }
   function totalNetProfit(){ return state.sales.reduce(function(a,s){ return a+Number(s.netProfit||0); },0); }
   function preorderBatches(){ return state.batches.filter(function(b){ return b.status!=="received"; }); }
   function cashTiedUp(owner){
@@ -2870,15 +2902,19 @@
       if (!pid2){ toast("Pick an item"); return; }
       var profit = $("#f_profit").value;
       if (profit===""){ toast("Enter the net profit"); return; }
+      var addQty = Number($("#f_qty").value)||1;
+      var addDate = $("#f_date").value || todayISO();
+      var addWho = $("#f_who").value;
       addSale({
-        productId: pid2, quantitySold: Number($("#f_qty").value)||1,
-        saleDate: $("#f_date").value || todayISO(), netProfit: Number(profit)||0,
+        productId: pid2, quantitySold: addQty,
+        saleDate: addDate, netProfit: Number(profit)||0,
         soldPrice: $("#f_price").value ? Number($("#f_price").value) : null,
-        attributedTo: $("#f_who").value, note: $("#f_note").value.trim(),
+        attributedTo: addWho, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
         lifecycleStatus: $("#f_funds").value
       });
+      syncStockForSale(pid2, addQty, addWho, addDate, null);
       toast("Sale recorded");
       closeModal();
       return;
@@ -2886,15 +2922,20 @@
 
     if (action==="submit-edit-sale"){
       var sid = $("#f_id").value;
+      var editPid = $("#f_product").value;
+      var editQty = Number($("#f_qty").value)||1;
+      var editDate = $("#f_date").value || todayISO();
+      var editWho = $("#f_who").value;
       updateSale(sid, {
-        productId: $("#f_product").value, quantitySold: Number($("#f_qty").value)||1,
-        saleDate: $("#f_date").value || todayISO(), netProfit: Number($("#f_profit").value)||0,
+        productId: editPid, quantitySold: editQty,
+        saleDate: editDate, netProfit: Number($("#f_profit").value)||0,
         soldPrice: $("#f_price").value ? Number($("#f_price").value) : null,
-        attributedTo: $("#f_who").value, note: $("#f_note").value.trim(),
+        attributedTo: editWho, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
         lifecycleStatus: $("#f_funds").value
       });
+      syncStockForSale(editPid, editQty, editWho, editDate, sid);
       toast("Sale updated");
       closeModal();
       return;
@@ -2930,6 +2971,7 @@
         };
         if (existing){ updateSale(existing.id, patch); toast("Order updated"); }
         else { addSale(patch); toast("Order saved"); }
+        syncStockForSale(pid, patch.quantitySold, patch.attributedTo, patch.saleDate, existing ? existing.id : null);
         closeModal();
       };
 
