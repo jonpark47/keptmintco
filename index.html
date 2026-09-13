@@ -2194,9 +2194,12 @@
     // holds every dollar directly, so a sale Jax attributes to himself never owes anyone
     // anything, pending or not) — this count is deliberately narrower than "all pending sales"
     // for the same reason computeBalance() only ever sums Jon's side. Spelled out explicitly so
-    // it doesn't read as a bug when the total sale count and this count don't match.
+    // it doesn't read as a bug when the total sale count and this count don't match. Named both
+    // people explicitly rather than using "he"/"you" — this tile renders identically for
+    // whoever's viewing, and a pronoun picked from Jon's perspective ("...since HE already
+    // keeps...") reads as a factual error when Jax is the one looking at his own page.
     var pendingSub = pending.count
-      ? pending.count+" sale"+(pending.count===1?"":"s")+" attributed to Jon, still shipping / awaiting eBay payout — sales attributed to Jax aren't counted here, since he already keeps that money directly"
+      ? pending.count+" sale"+(pending.count===1?"":"s")+" attributed to Jon, still shipping / awaiting eBay payout — sales attributed to Jax aren't counted here, since Jax already keeps that money directly"
       : "Nothing attributed to Jon is still waiting on eBay to pay out.";
     var html = "<div class='tiles'>"+
       "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed.</div></div>"+
