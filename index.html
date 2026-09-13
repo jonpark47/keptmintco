@@ -1775,14 +1775,29 @@
   }
 
   // ---------- derived data ----------
+  // Only sales whose payout has actually landed (lifecycleStatus !== "pending") count toward
+  // the real, collectible balance — Jax can't hand Jon money eBay hasn't released to him yet.
+  // A preorder sale can sit "pending" for months (sold now, shipped and paid out later), so
+  // folding it into the same number as already-settled cash overstates what's actually
+  // available to pay out today. Settlements (real cash already exchanged) always net against
+  // this pool — there's nothing else they could have been drawn from.
   function computeBalance(){
     var bal = 0;
-    state.sales.forEach(function(s){ if (s.attributedTo === "Jon") bal += Number(s.netProfit||0); });
+    state.sales.forEach(function(s){ if (s.attributedTo === "Jon" && s.lifecycleStatus !== "pending") bal += Number(s.netProfit||0); });
     state.settlements.forEach(function(t){
       if (t.from === "Jax" && t.to === "Jon") bal -= Number(t.amount||0);
       else if (t.from === "Jon" && t.to === "Jax") bal += Number(t.amount||0);
     });
     return bal;
+  }
+  // The flip side: money tied up in sales that haven't paid out yet. Real, eventually-owed
+  // money — just not anything Jax could actually hand over right now. Shown separately so
+  // "how much can we actually settle today" and "how much is still coming" never get blurred
+  // into one misleading number.
+  function pendingBalance(){
+    var bal = 0, count = 0;
+    state.sales.forEach(function(s){ if (s.attributedTo === "Jon" && s.lifecycleStatus === "pending"){ bal += Number(s.netProfit||0); count++; } });
+    return { amount: bal, count: count };
   }
   // bal > 0 means Jax owes Jon. Phrased from `viewer`'s own point of view, not third-person.
   function balanceLine(bal, viewer){
@@ -1925,7 +1940,7 @@
     if (!upcoming.length){
       html += state.batches.length
         ? "<div class='card empty'><div class='ic' data-icon='check'></div>Everything you've ordered has arrived.</div>"
-        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>No preorders yet — add one from Inventory.</div>";
+        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder). An eBay order you've scanned that happens to be a preorder listing is a different thing (that's a sale, tracked in Sales/Orders) and won't show up here.</div>";
     } else {
       html += "<div class='card table-wrap'><table><thead><tr><th>Item</th><th>Owner</th><th>Qty</th><th>Expected</th><th>Status</th></tr></thead><tbody>";
       upcoming.forEach(function(b){
@@ -1988,7 +2003,7 @@
     if (!rows.length){
       html += state.batches.length
         ? "<div class='card empty'><div class='ic' data-icon='check'></div>Everything on order has arrived.</div>"
-        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>No preorders yet — add one from Inventory.</div>";
+        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder). Scanning an eBay order here that happens to be a preorder listing is a different thing (that's a sale, tracked in Sales/Orders) and won't show up in this pipeline.</div>";
       return html;
     }
     html += "<div class='card table-wrap'><table><thead><tr><th>Item</th><th>Owner</th><th>Qty</th><th>Unit cost</th><th>Committed</th><th>Status</th><th>Expected</th><th></th></tr></thead><tbody>";
@@ -2076,7 +2091,14 @@
     var rows = state.settlements.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); });
     var bal = computeBalance();
     var bl = balanceLine(bal, whoAmI);
-    var html = "<div class='tiles'><div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Balance between you two</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>Sales run through Jax's eBay, so this is the tab that keeps it fair.</div></div></div>";
+    var pending = pendingBalance();
+    var pendingSub = pending.count
+      ? pending.count+" sale"+(pending.count===1?"":"s")+" still shipping / awaiting eBay payout"
+      : "Nothing sold right now is still waiting on eBay to pay out.";
+    var html = "<div class='tiles'>"+
+      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed.</div></div>"+
+      "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
+      "</div>";
     html += "<div class='section-head'><h2>Payment history</h2><button class='btn primary' data-action='open-add-settlement'><span class='ic' data-icon='plus'></span> Record payment</button></div>";
     if (!rows.length){ html += "<div class='card empty'><div class='ic' data-icon='settlements'></div>No payments logged between you two yet.</div>"; return html; }
     html += "<div class='card table-wrap'><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>";
