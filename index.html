@@ -2201,22 +2201,25 @@
     var pendingSub = pending.count
       ? pending.count+" sale"+(pending.count===1?"":"s")+" attributed to Jon, still shipping / awaiting eBay payout — sales attributed to Jax aren't counted here, since Jax already keeps that money directly"
       : "Nothing attributed to Jon is still waiting on eBay to pay out.";
-    var html = "<div class='tiles'>"+
-      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed.</div></div>"+
-      "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
-      "</div>";
 
-    // The two tiles above are specifically about the debt between Jon and Jax, which only ever
-    // runs in one direction (Jon-attributed sales) — that's correct, but it means Jax opening
-    // this tab sees nothing about HIS OWN sales at all. Both of them use this same shared ledger
-    // to track their own flips, so whoever's currently viewing gets their own total/available/
-    // pending breakdown here too, independent of whether it affects the shared balance.
+    // Jon's call: his own net profit is what he actually wants to see first when he opens this
+    // tab day to day — the cross-partner debt tiles matter less often (only when it's actually
+    // time to settle up), so they now sit below instead of leading. Whoever's currently viewing
+    // gets their own total/available/pending breakdown here, independent of whether it affects
+    // the shared balance (a sale Jax attributes to himself never owes anyone anything, but he
+    // still wants to track it — see ownerProfitBreakdown()).
     var mine = ownerProfitBreakdown(whoAmI);
     var mineSub = mine.pendingCount
       ? money(mine.available)+" available · "+money(mine.pending)+" pending across "+mine.pendingCount+" sale"+(mine.pendingCount===1?"":"s")
       : money(mine.available)+" available · nothing pending right now";
-    html += "<div class='section-head'><h2>Your own numbers</h2></div>"+
-      "<div class='tiles'><div class='tile'><div class='eyebrow'>Your net profit</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div></div>";
+    var html = "<div class='tiles'><div class='tile'><div class='eyebrow'>Your net profit</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div></div>";
+
+    html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
+    html += "<div class='tiles'>"+
+      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed.</div></div>"+
+      "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
+      "</div>";
+
     html += "<div class='section-head'><h2>Payment history</h2><button class='btn primary' data-action='open-add-settlement'><span class='ic' data-icon='plus'></span> Record payment</button></div>";
     if (!rows.length){ html += "<div class='card empty'><div class='ic' data-icon='settlements'></div>No payments logged between you two yet.</div>"; return html; }
     html += "<div class='card table-wrap'><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>";
