@@ -1548,16 +1548,19 @@
       flag("orderNumber", "warn", "Order # has two disagreeing reads: the original (\""+extracted.orderNumberZoomConflict.original+"\") and a zoomed-in re-read (\""+extracted.orderNumberZoomConflict.zoomed+"\"). Worth a glance — but a disagreement here doesn't necessarily mean the displayed one is wrong.");
     }
 
-    // Flag-not-overwrite, same policy as Subtotal now uses: `earningsConflict` means the
-    // directly-read "Order earnings" and the orderTotal-minus-fees computed value disagreed,
-    // and the zoom pass (see scanScreenshot) either couldn't settle which one to trust or
-    // hasn't run yet — orderEarnings stays at the ORIGINAL directly-read value in this case
-    // (never silently overwritten by the computed one), so this flag is the only place either
-    // number surfaces. Removed the old auto-correct-then-flag-if-zoom-disagrees design after
-    // it silently overwrote an already-correct Subtotal on a real order, once one of the
-    // "trusted" inputs (Shipping) turned out to carry the same dropped-digit error — Order
-    // earnings' computed value leans on transaction fees / shipping label cost, which are
-    // exactly as single-read and exactly as exposed to that failure mode.
+    // `earningsConflict` means the directly-read "Order earnings" and the orderTotal-minus-fees
+    // computed value disagreed at extraction time. Unlike Subtotal's equivalent conflict (which
+    // CAN reach here still unresolved — findBreakdownCulprit() has a genuine "stayed ambiguous"
+    // outcome), scanScreenshot()'s earnings-conflict resolution always ends by clearing this
+    // flag one way or another (zoom confirms computed → trust computed; zoom doesn't → verify
+    // Transaction fees/Shipping label independently, correcting whichever one explains it, or
+    // falling back to computed if both check out clean) — a deliberate choice, since re-reading
+    // the tiny "Order earnings" line under magnification has proven no more reliable than the
+    // original read, so there's no real "third opinion" left to wait on for this specific field.
+    // In practice this means a real scan should never reach this branch with the flag still
+    // set; it stays here as a defensive fallback in case that resolution step doesn't run at
+    // all (e.g. an exception earlier in scanScreenshot, or the "Order earnings" line not found
+    // on the page for the zoom crop).
     if (extracted.earningsConflict){
       flag("orderEarnings", "warn", "Net profit is ambiguous: the OCR'd \"Order earnings\" ($"+extracted.earningsConflict.original.toFixed(2)+") doesn't reconcile with Order total minus fees ($"+extracted.earningsConflict.computed.toFixed(2)+"). Either could be the wrong one — check against the screenshot before saving.");
     }
@@ -2055,7 +2058,7 @@
         "<div class='hint'>An eBay Seller Hub order-details screenshot. Fields are read automatically right in your browser (first scan loads a small OCR engine, ~5–10s; after that it's fast). Upload it right when the item sells, then upload the same order again once it ships and pays out — it'll update the same entry, not duplicate it.</div>"+
       "</div>";
     } else {
-      html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Screenshot storage isn't available in this view. Open the published link in Claude, or use Record sale in the Sales tab to enter an order by hand.</div>";
+      html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Couldn't connect to screenshot storage — check your internet connection and reload the page, or use Record sale in the Sales tab to enter an order by hand in the meantime.</div>";
     }
 
     var withShots = state.sales.filter(function(s){ return s.screenshots && s.screenshots.length; })
@@ -2200,7 +2203,11 @@
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' placeholder='0.00'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username (optional)</label><input id='f_buyer' type='text' placeholder='eBay username, e.g. cancerv_96'></div>"+
       "<div class='field'><label>Order # (optional)</label><input id='f_ordernum' type='text' placeholder='11-15148-37978'></div></div>"+
-      "<div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(suggested)+"</select><div class='hint'>Suggested from your priority rule (Jon fills his batch quantity first) — change it anytime.</div></div>"+
+      "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(suggested)+"</select><div class='hint'>Suggested from your priority rule (Jon fills his batch quantity first) — change it anytime.</div></div>"+
+      "<div class='field'><label>Funds status</label><select id='f_funds'>"+
+        "<option value='pending' selected>Pending payout</option>"+
+        "<option value='completed'>Completed</option>"+
+      "</select><div class='hint'>eBay holds buyer funds until the item ships and is delivered — leave this as Pending unless you've actually been paid out already.</div></div></div>"+
       "<div class='field'><label>Note</label><textarea id='f_note' placeholder='Optional'></textarea></div>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-add-sale'>Save sale</button>"
     );
@@ -2870,7 +2877,7 @@
         attributedTo: $("#f_who").value, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
-        lifecycleStatus: "completed"
+        lifecycleStatus: $("#f_funds").value
       });
       toast("Sale recorded");
       closeModal();
