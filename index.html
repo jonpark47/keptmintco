@@ -228,6 +228,7 @@
   .badge.overdue{ background:var(--bad-soft); color:var(--bad); }
   .badge.review{ background:var(--warn-soft); color:var(--warn); }
   .owner-cell{ display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
+  .stack-cell{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
   .badge.lifecycle-pending{ background:var(--warn-soft); color:var(--warn); }
   .badge.lifecycle-completed{ background:var(--good-soft); color:var(--good); }
 
@@ -417,6 +418,10 @@
   var OWNERS = ["Jon","Jax"];
   var STATUS_LABEL = { preorder:"Preordered", transit:"In transit", received:"Received" };
   var CATS = ["Pokémon TCG","Video Games & Consoles","Sports Cards","Other Collectibles"];
+  // Shared with submit-edit-batch below: editing a batch that still carries this exact
+  // placeholder note clears it automatically, since filling in the real cost IS the
+  // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
+  var AUTO_BATCH_NOTE = "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.";
 
   var state = { products: [], batches: [], sales: [], settlements: [] };
   var db = null;
@@ -1673,7 +1678,7 @@
 
   // ---------- icons (line-style, SF-Symbol-ish; no emoji anywhere in the UI) ----------
   var ICON_PATHS = {
-    logo: '<path d="M12 2C16.5 6.5 17 14 12 22C7 14 7.5 6.5 12 2Z" style="fill:#fff;stroke:none;"/><path d="M12 4.5C12 4.5 12.5 12 12 19.5" style="stroke:var(--accent);stroke-width:1.1;fill:none;stroke-linecap:round;"/><path d="M12 8L15 6.5M12 8L9 6.5" style="stroke:var(--accent);stroke-width:1;fill:none;stroke-linecap:round;"/><path d="M12 12.3L15.3 11.2M12 12.3L8.7 11.2" style="stroke:var(--accent);stroke-width:1;fill:none;stroke-linecap:round;"/><path d="M12 16.3L14.8 15.4M12 16.3L9.2 15.4" style="stroke:var(--accent);stroke-width:1;fill:none;stroke-linecap:round;"/>',
+    logo: '<path d="M6.05 8.05c-2.73 2.73-2.73 7.15-.02 9.88 1.47-3.4 4.09-6.24 7.36-7.93-2.77 2.34-4.71 5.61-5.39 9.32 2.6 1.23 5.8.78 7.95-1.37C19.43 14.47 20 4 20 4S9.53 4.55 6.05 8.05z" style="fill:#fff;stroke:none;"/>',
     overview: '<path d="M4 20V11M10 20V5M16 20V14"/>',
     inventory: '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 7v10l9 4 9-4V7"/><path d="M12 11v10"/>',
     preorders: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/>',
@@ -1859,7 +1864,7 @@
     return addBatch({
       productId: productId, owner: attributedTo || whoAmI, quantity: shortfall, unitCost: 0,
       status: "preorder", sourceSaleId: saleId || null,
-      note: "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.",
+      note: AUTO_BATCH_NOTE,
       needsReview: true
     });
   }
@@ -2031,8 +2036,8 @@
         batches.forEach(function(b){
           var du = daysUntil(b.expectedArrival);
           var dateCell = b.status==="received" ? fmtDate(b.receivedDate) : (b.expectedArrival ? fmtDate(b.expectedArrival)+(du!=null&&du<0?" <span class='badge overdue'>late</span>":"") : "—");
-          html += "<tr><td data-label='Owner'><div class='owner-cell'>"+(b.needsReview?"<span class='badge review'>cost unknown</span>":"")+"<span class='badge owner-"+b.owner+"'>"+b.owner+"</span></div></td>"+
-            "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+money(b.unitCost)+"</td><td class='num-cell' data-label='Total'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
+          html += "<tr><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td>"+
+            "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+(b.needsReview?"<div class='stack-cell'>"+money(b.unitCost)+"<span class='badge review'>Cost unknown</span></div>":money(b.unitCost))+"</td><td class='num-cell' data-label='Total'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
             "<td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td data-label='Expected / Received'>"+dateCell+"</td>"+
             "<td class='cell-note' data-label='Note' title='"+esc(b.note||"")+"'>"+esc(b.note||"")+"</td>"+
             "<td data-label='Actions'><div class='row-actions'>"+
@@ -2934,12 +2939,17 @@
 
     if (action==="submit-edit-batch"){
       var id = $("#f_id").value;
+      // Saving an edit at all is the acknowledgment that this batch has been reviewed — if the
+      // note field still holds the exact auto-fill placeholder text untouched, clear it instead
+      // of leaving it to sit there forever next to a now-real cost the user just entered.
+      var editedNote = $("#f_note").value.trim();
+      if (editedNote === AUTO_BATCH_NOTE) editedNote = "";
       updateBatch(id, {
         owner: $("#f_owner").value, quantity: Number($("#f_qty").value)||1,
         unitCost: Number($("#f_cost").value)||0, status: $("#f_status").value,
         expectedArrival: $("#f_arrival").value || null,
         receivedDate: $("#f_status").value==="received" ? (todayISO()) : null,
-        note: $("#f_note").value.trim(), needsReview:false
+        note: editedNote, needsReview:false
       });
       toast("Batch updated");
       closeModal();
