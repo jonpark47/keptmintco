@@ -409,7 +409,7 @@
 <div id="modalRoot"></div>
 <div id="lightboxRoot"></div>
 <div id="toastRoot"></div>
-<input type="file" id="scanFileInput" accept="image/*" style="display:none;">
+<input type="file" id="scanFileInput" accept="image/*,.csv,text/csv" style="display:none;">
 
 <script>
 (function(){
@@ -1960,6 +1960,230 @@
     if (!salesRecordNo) return null;
     return state.sales.find(function(s){ return s.salesRecordNo && s.salesRecordNo===salesRecordNo; }) || null;
   }
+
+  // ---------- CSV import (eBay's own structured exports — no OCR, no fuzzy matching) ----------
+  // eBay's Seller Hub offers real data exports that make every OCR failure mode this app has
+  // fought all session (digit-loss, title truncation/contamination, fuzzy product-matching
+  // collisions) simply not apply: the "Orders Report" (Seller Hub > Orders > Download) gives
+  // clean buyer/item/order fields straight from eBay's backend, and the Payments "Transaction
+  // report" (Seller Hub > Payments > Reports) gives the one thing OCR could never reliably read
+  // — eBay's own computed "Net amount" (net profit), plus real fee line items and a structured
+  // "Reason for hold" payout-status field. Both files share "Order number" as an exact join key.
+  // A user can upload either file, in either order, any number of times — importCSVRecords()
+  // upserts by order number so a later upload fills in whatever the first one didn't have
+  // instead of creating a duplicate sale.
+  function parseCSVText(text){
+    var rows = [];
+    var row = [];
+    var field = "";
+    var inQuotes = false;
+    var i = 0;
+    while (i < text.length){
+      var c = text[i];
+      if (inQuotes){
+        if (c === '"'){
+          if (text[i+1] === '"'){ field += '"'; i += 2; continue; }
+          inQuotes = false; i++; continue;
+        }
+        field += c; i++; continue;
+      } else {
+        if (c === '"'){ inQuotes = true; i++; continue; }
+        if (c === ','){ row.push(field); field = ""; i++; continue; }
+        if (c === '\r'){ i++; continue; }
+        if (c === '\n'){ row.push(field); rows.push(row); row = []; field = ""; i++; continue; }
+        field += c; i++; continue;
+      }
+    }
+    if (field.length || row.length){ row.push(field); rows.push(row); }
+    return rows;
+  }
+  function findHeaderRowIndex(rows, firstCellMatch){
+    for (var i=0; i<rows.length; i++){ if (rows[i][0] && rows[i][0].trim() === firstCellMatch) return i; }
+    return -1;
+  }
+  function buildColIndex(headerRow){
+    var idx = {};
+    headerRow.forEach(function(name, i){ idx[name.trim()] = i; });
+    return idx;
+  }
+  function csvMoney(v){
+    if (v==null) return null;
+    var s = String(v).trim();
+    if (s==="" || s==="--") return null;
+    var n = Number(s.replace(/[$,]/g,""));
+    return isNaN(n) ? null : n;
+  }
+  var CSV_MONTHS = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  function parseFlexibleDate(str){
+    if (!str) return null;
+    str = String(str).trim();
+    if (str==="" || str==="--") return null;
+    var m = str.match(/^([A-Za-z]{3})-(\d{1,2})-(\d{2,4})$/);
+    if (m){
+      var mo = CSV_MONTHS[m[1]]; if (!mo) return null;
+      var yr = m[3].length===2 ? '20'+m[3] : m[3];
+      return yr+'-'+mo+'-'+(m[2].length===1?'0'+m[2]:m[2]);
+    }
+    m = str.match(/^([A-Za-z]{3})[a-z]*\s+(\d{1,2}),?\s+(\d{4})$/);
+    if (m){
+      var mo2 = CSV_MONTHS[m[1].slice(0,3)]; if (!mo2) return null;
+      return m[3]+'-'+mo2+'-'+(m[2].length===1?'0'+m[2]:m[2]);
+    }
+    return null;
+  }
+  function parseOrdersReportCSV(text){
+    var rows = parseCSVText(text);
+    var headerIdx = findHeaderRowIndex(rows, "Sales Record Number");
+    if (headerIdx === -1) return null;
+    var col = buildColIndex(rows[headerIdx]);
+    var out = [];
+    for (var i=headerIdx+1; i<rows.length; i++){
+      var r = rows[i];
+      var orderNumber = r[col["Order Number"]];
+      // Guards against the report's own trailing "N,record(s) downloaded," footer line, whose
+      // short column count happens to land non-empty text in whatever index "Order Number"
+      // maps to — a real eBay order number always matches this exact XX-XXXXX-XXXXX shape.
+      if (!orderNumber || !/^\d{2}-\d{5}-\d{5}$/.test(orderNumber.trim())) continue;
+      orderNumber = orderNumber.trim();
+      out.push({
+        salesRecordNo: r[col["Sales Record Number"]] || null,
+        orderNumber: orderNumber,
+        buyerName: (r[col["Buyer Username"]]||"").trim() || null,
+        itemId: (r[col["Item Number"]]||"").trim() || null,
+        title: (r[col["Item Title"]]||"").trim() || null,
+        quantitySold: Number(r[col["Quantity"]])||1,
+        soldFor: csvMoney(r[col["Sold For"]]),
+        shippingChargedToBuyer: csvMoney(r[col["Shipping And Handling"]]),
+        saleDate: parseFlexibleDate(r[col["Sale Date"]]),
+        shippedOnDate: parseFlexibleDate(r[col["Shipped On Date"]])
+      });
+    }
+    return out;
+  }
+  function parseTransactionReportCSV(text){
+    var rows = parseCSVText(text);
+    var headerIdx = findHeaderRowIndex(rows, "Transaction creation date");
+    if (headerIdx === -1) return null;
+    var col = buildColIndex(rows[headerIdx]);
+    var out = [];
+    for (var i=headerIdx+1; i<rows.length; i++){
+      var r = rows[i];
+      if (!r[col["Type"]] || r[col["Type"]].trim() !== "Order") continue;
+      var orderNumber = r[col["Order number"]];
+      if (!orderNumber || !/^\d{2}-\d{5}-\d{5}$/.test(orderNumber.trim())) continue;
+      orderNumber = orderNumber.trim();
+      var feeFixed = csvMoney(r[col["Final Value Fee - fixed"]]) || 0;
+      var feeVariable = csvMoney(r[col["Final Value Fee - variable"]]) || 0;
+      var reasonForHold = (r[col["Reason for hold"]]||"").trim();
+      out.push({
+        orderNumber: orderNumber,
+        buyerName: (r[col["Buyer username"]]||"").trim() || null,
+        itemId: (r[col["Item ID"]]||"").trim() || null,
+        title: (r[col["Item title"]]||"").trim() || null,
+        quantitySold: Number(r[col["Quantity"]])||1,
+        subtotal: csvMoney(r[col["Item subtotal"]]),
+        shippingChargedToBuyer: csvMoney(r[col["Shipping and handling"]]),
+        salesTax: csvMoney(r[col["eBay collected tax"]]) || csvMoney(r[col["Seller collected tax"]]),
+        transactionFees: Math.round((feeFixed+feeVariable)*100)/100,
+        netProfit: csvMoney(r[col["Net amount"]]),
+        lifecycleStatus: reasonForHold ? "pending" : "completed",
+        saleDate: parseFlexibleDate(r[col["Transaction creation date"]])
+      });
+    }
+    return out;
+  }
+  function upsertProductForCSV(itemId, title){
+    var existing = itemId ? state.products.find(function(p){ return p.itemId === itemId; }) : null;
+    if (existing) return Promise.resolve(existing.id);
+    return addProduct({ name: title || "Unknown item", category: "Other", itemId: itemId || null }).then(function(ref){
+      return ref && ref.id ? ref.id : ref;
+    });
+  }
+  // Upserts by order number — the exact, always-present join key in both eBay reports — instead
+  // of the fuzzy title/word-overlap matching OCR needs, since a CSV's item title is always the
+  // exact real listing text and its order number is always exact too. A field only overwrites
+  // an existing sale's value when this import's own source actually has it (checked one at a
+  // time below), so importing the Orders Report first and the Transaction report second (or
+  // vice versa) always merges into one complete record instead of the second wiping the first.
+  function importCSVRecords(records){
+    var created = 0, updated = 0;
+    var chain = Promise.resolve();
+    records.forEach(function(rec){
+      chain = chain.then(function(){
+        return upsertProductForCSV(rec.itemId, rec.title).then(function(pid){
+          var existing = findByOrderNumber(rec.orderNumber);
+          var patch = { productId: pid, orderNumber: rec.orderNumber };
+          if (rec.buyerName) patch.buyerName = rec.buyerName;
+          if (rec.quantitySold) patch.quantitySold = rec.quantitySold;
+          if (rec.saleDate) patch.saleDate = rec.saleDate;
+          if (rec.salesRecordNo) patch.salesRecordNo = rec.salesRecordNo;
+          if (rec.soldFor != null) patch.soldPrice = rec.soldFor;
+          if (rec.subtotal != null) patch.soldPrice = rec.subtotal;
+          if (rec.netProfit != null) patch.netProfit = rec.netProfit;
+          if (rec.lifecycleStatus) patch.lifecycleStatus = rec.lifecycleStatus;
+          var finalDate = patch.saleDate || (existing && existing.saleDate) || todayISO();
+          if (existing){
+            updated++;
+            return updateSale(existing.id, patch).then(function(){
+              return syncStockForSale(pid, patch.quantitySold||existing.quantitySold, existing.attributedTo, finalDate, existing.id, existing.id);
+            });
+          } else {
+            created++;
+            patch.attributedTo = suggestOwner(pid);
+            patch.lifecycleStatus = patch.lifecycleStatus || "pending";
+            patch.quantitySold = patch.quantitySold || 1;
+            return addSale(patch).then(function(ref){
+              var sid = ref && ref.id ? ref.id : ref;
+              // excludeSaleId = sid (its own id), not null: addSale() already pushed this sale
+              // into state.sales synchronously in the offline/local fallback path (db===null),
+              // so by the time this runs, the loop inside syncStockForSale would otherwise count
+              // this brand-new sale's quantity a second time — once via the explicit parameter,
+              // once by finding itself in state.sales unexcluded. With real Firestore this
+              // never manifests (the onSnapshot update lands later, well after this callback),
+              // which is exactly why it went undetected until a Node test exercised the offline
+              // path directly — but excluding its own id is correct and harmless either way, so
+              // there's no reason to depend on that timing at all.
+              return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, finalDate, sid, sid);
+            });
+          }
+        });
+      });
+    });
+    return chain.then(function(){ return { created: created, updated: updated }; });
+  }
+  function importCSV(file){
+    return file.text().then(function(text){
+      var records = parseOrdersReportCSV(text);
+      var label = "Orders Report";
+      if (!records){
+        records = parseTransactionReportCSV(text);
+        label = "Transaction report";
+      }
+      if (!records){
+        toast("That CSV doesn't look like an eBay Orders Report or Transaction report — check you downloaded the right file.");
+        return;
+      }
+      if (!records.length){
+        toast("No real orders found in that "+label+" — nothing to import.");
+        return;
+      }
+      scanState = { active:true, label:"Importing "+records.length+" order"+(records.length===1?"":"s")+" from "+label+"…" };
+      render();
+      return importCSVRecords(records).then(function(result){
+        scanState = { active:false, label:"" };
+        var parts = [];
+        if (result.created) parts.push(result.created+" new order"+(result.created===1?"":"s")+" added");
+        if (result.updated) parts.push(result.updated+" existing order"+(result.updated===1?"":"s")+" updated");
+        toast("Imported from "+label+": "+(parts.join(", ")||"nothing new")+".");
+        render();
+      });
+    }).catch(function(e){
+      scanState = { active:false, label:"" };
+      console.warn("CSV import failed", e);
+      toast("Couldn't read that CSV file.");
+      render();
+    });
+  }
   function findSoftDuplicate(buyerName, productId, saleDate){
     if (!buyerName || !productId) return null;
     var target = saleDate ? new Date(saleDate+"T00:00:00").getTime() : null;
@@ -2136,8 +2360,8 @@
     }
     if (canUpload){
       html += "<div class='dropzone' id='dropzone' data-action='open-file-picker'>"+
-        "<div class='ic' data-icon='camera'></div><div class='lead'>Drop a screenshot here, or tap to choose one</div>"+
-        "<div class='hint'>An eBay Seller Hub order-details screenshot. Fields are read automatically right in your browser (first scan loads a small OCR engine, ~5–10s; after that it's fast). Upload it right when the item sells, then upload the same order again once it ships and pays out — it'll update the same entry, not duplicate it.</div>"+
+        "<div class='ic' data-icon='camera'></div><div class='lead'>Drop a screenshot or eBay CSV here, or tap to choose one</div>"+
+        "<div class='hint'>An eBay Seller Hub order-details screenshot (read automatically via OCR — first scan loads a small engine, ~5–10s, then it's fast), or one of eBay's own exports for perfectly accurate bulk import: an <b>Orders Report</b> (Seller Hub → Orders → Download report) or a Payments <b>Transaction report</b> (Seller Hub → Payments → Reports) — upload both and they merge into the same orders by order number, no duplicates. Upload right when an item sells, then again once it ships and pays out — it updates the same entry.</div>"+
       "</div>";
     } else {
       html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Couldn't connect to screenshot storage — check your internet connection and reload the page, or use Record sale in the Sales tab to enter an order by hand in the meantime.</div>";
@@ -2981,7 +3205,11 @@
         orderNumber: $("#f_ordernum").value.trim() || null,
         lifecycleStatus: $("#f_funds").value
       }).then(function(ref){
-        syncStockForSale(pid2, addQty, addWho, addDate, ref && ref.id ? ref.id : ref, null);
+        var newSaleId = ref && ref.id ? ref.id : ref;
+        // excludeSaleId = its own id, not null — see the matching comment in importCSVRecords
+        // for why: the offline/local fallback path adds this sale to state.sales synchronously,
+        // before this callback runs, so excluding anything else risks double-counting it.
+        syncStockForSale(pid2, addQty, addWho, addDate, newSaleId, newSaleId);
       });
       toast("Sale recorded");
       closeModal();
@@ -3052,7 +3280,11 @@
         } else {
           addSale(patch).then(function(ref){
             var newSaleId = ref && ref.id ? ref.id : ref;
-            return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, patch.saleDate, newSaleId, null)
+            // excludeSaleId = its own id, not null — see the matching comment in
+            // importCSVRecords for why: the offline/local fallback path adds this sale to
+            // state.sales synchronously, before this callback runs, so excluding anything else
+            // risks double-counting it.
+            return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, patch.saleDate, newSaleId, newSaleId)
               .then(function(){ if (justDelivered) return markSaleReceived(newSaleId); });
           });
           toast("Order saved");
@@ -3124,10 +3356,15 @@
     if (e.key === "Escape" && $("#modalRoot .modal")) closeModal();
   });
 
+  function handleDroppedFile(f){
+    if (!f) return;
+    var isCSV = f.type === "text/csv" || /\.csv$/i.test(f.name||"");
+    if (isCSV) importCSV(f); else scanScreenshot(f);
+  }
   $("#scanFileInput").addEventListener("change", function(){
     var f = this.files && this.files[0];
     this.value = "";
-    if (f) scanScreenshot(f);
+    handleDroppedFile(f);
   });
   document.addEventListener("dragover", function(e){
     if (e.target.closest && e.target.closest("#dropzone")){ e.preventDefault(); e.target.closest("#dropzone").classList.add("drag"); }
@@ -3142,7 +3379,7 @@
     e.preventDefault();
     dz.classList.remove("drag");
     var f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (f) scanScreenshot(f);
+    handleDroppedFile(f);
   });
 
   var whoSel = $("#whoAmI");
