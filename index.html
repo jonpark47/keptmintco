@@ -2123,8 +2123,36 @@
     var chain = Promise.resolve();
     records.forEach(function(rec){
       chain = chain.then(function(){
-        return upsertProductForCSV(rec.itemId, rec.title).then(function(pid){
-          var existing = findByOrderNumber(rec.orderNumber);
+        // Real bug, found live: resolving the product by item ID on every import — even for an
+        // order that's ALREADY linked to a sale — created a duplicate product whenever that
+        // existing product's item ID happened to be missing (e.g. an original OCR scan that
+        // never captured a clean "Item ID:" line, which is exactly what happened to a real GTA6
+        // order here). The sale then got silently re-pointed at the new duplicate, orphaning
+        // the ORIGINAL product and every batch on it — including a manually-entered unit
+        // cost/expected-arrival Jon had typed in by hand, which is why it looked deleted even
+        // though nothing was actually destroyed, just abandoned. Order number is a stronger,
+        // already-exact signal than item ID for an order that's already in the system: if a
+        // sale already exists for this order, its productId is ALREADY correct (whatever it
+        // is) — reuse it directly instead of re-deriving the product at all, so linkage can
+        // never drift. Only a genuinely new order (no existing sale for this order number at
+        // all) goes through item-ID-based product matching/creation.
+        var existingForProduct = findByOrderNumber(rec.orderNumber);
+        var productStep = existingForProduct
+          ? Promise.resolve(existingForProduct.productId).then(function(pid){
+              // Bonus correctness fix while we're here: backfill the item ID onto whatever
+              // product this order already points to, if it's missing one — so a FUTURE import
+              // of a different order for the same listing can match by item ID cleanly instead
+              // of hitting this same gap again.
+              var prod = productById(pid);
+              var productPatch = {};
+              if (prod && !prod.itemId && rec.itemId) productPatch.itemId = rec.itemId;
+              if (prod && rec.title && rec.title !== prod.name) productPatch.name = rec.title;
+              if (Object.keys(productPatch).length) updateProduct(pid, productPatch);
+              return pid;
+            })
+          : upsertProductForCSV(rec.itemId, rec.title);
+        return productStep.then(function(pid){
+          var existing = existingForProduct;
           // Tracks WHICH fields this import actually verified, per field — not a single
           // all-or-nothing flag — because the two report types cover different subsets (the
           // Orders Report alone never provides netProfit/lifecycleStatus at all). A sale touched
