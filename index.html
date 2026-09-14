@@ -1754,6 +1754,9 @@
     data = Object.assign({ createdBy: whoAmI, createdAt: Date.now() }, data);
     return db ? db.collection("products").add(data) : localAdd("products", data);
   }
+  function updateProduct(id, patch){
+    return db ? db.doc("products/"+id).update(patch) : localUpdate("products", id, patch);
+  }
   function addBatch(data){
     data = Object.assign({ createdBy: whoAmI, createdAt: Date.now() }, data);
     return db ? db.collection("batches").add(data) : localAdd("batches", data);
@@ -2092,9 +2095,19 @@
     }
     return out;
   }
+  // Jon's directive: CSV data is the most trustworthy source in this app (real, structured,
+  // straight from eBay's backend) — wherever it disagrees with something already on record
+  // (almost always an earlier OCR scan of the same listing, which is exactly the kind of
+  // digit-loss/truncation-prone read this CSV path exists to route around), the CSV wins.
+  // Applies here to the product's own name, not just fields on the sale: a product matched by
+  // item ID keeps that id forever, but its stored title gets corrected to the CSV's exact text
+  // whenever they differ, rather than leaving whatever an earlier OCR guess produced in place.
   function upsertProductForCSV(itemId, title){
     var existing = itemId ? state.products.find(function(p){ return p.itemId === itemId; }) : null;
-    if (existing) return Promise.resolve(existing.id);
+    if (existing){
+      if (title && title !== existing.name) updateProduct(existing.id, { name: title });
+      return Promise.resolve(existing.id);
+    }
     return addProduct({ name: title || "Unknown item", category: "Other", itemId: itemId || null }).then(function(ref){
       return ref && ref.id ? ref.id : ref;
     });
@@ -2112,7 +2125,11 @@
       chain = chain.then(function(){
         return upsertProductForCSV(rec.itemId, rec.title).then(function(pid){
           var existing = findByOrderNumber(rec.orderNumber);
-          var patch = { productId: pid, orderNumber: rec.orderNumber };
+          // Marks this sale as CSV-verified so a later OCR re-scan of the same order (see
+          // finishSave in submit-scan-review) knows not to overwrite these fields with a less
+          // reliable guess — Jon's explicit call: this data source takes priority whenever the
+          // two disagree, permanently, not just at the moment of this one import.
+          var patch = { productId: pid, orderNumber: rec.orderNumber, csvVerified: true };
           if (rec.buyerName) patch.buyerName = rec.buyerName;
           if (rec.quantitySold) patch.quantitySold = rec.quantitySold;
           if (rec.saleDate) patch.saleDate = rec.saleDate;
@@ -3265,6 +3282,18 @@
           screenshots: newShots,
           note: existing ? (existing.note||"") : ""
         };
+        // CSV import (Orders Report / Transaction report) is the most trustworthy data source in
+        // this app — exact, structured, straight from eBay's backend — versus this OCR pass,
+        // exactly the kind of digit-loss/fuzzy-match-prone read CSV import exists to route
+        // around. Jon's explicit call: once a sale has been touched by a CSV import
+        // (existing.csvVerified), a later OCR re-scan must not silently regress its "hard" data
+        // fields back to a less reliable guess. Screenshots, notes/alerts, funds status, and
+        // attributedTo (a manual choice either way, not an OCR read) still update normally.
+        if (existing && existing.csvVerified){
+          delete patch.productId; delete patch.quantitySold; delete patch.saleDate;
+          delete patch.netProfit; delete patch.soldPrice; delete patch.buyerName;
+          delete patch.orderNumber; delete patch.salesRecordNo;
+        }
         // If this scan's OCR text found a real "Delivered on <date>" line (a signal already
         // proven against a real order this session — see the Newgate order throughout this
         // codebase's history), that's hard proof the item shipped and arrived, which can only
@@ -3275,7 +3304,10 @@
         if (existing){
           updateSale(existing.id, patch);
           toast("Order updated");
-          syncStockForSale(pid, patch.quantitySold, patch.attributedTo, patch.saleDate, existing.id, existing.id)
+          // patch.quantitySold/saleDate may have just been stripped above (csvVerified) — fall
+          // back to the existing sale's own values so this doesn't undercount its contribution
+          // to the product's total committed stock.
+          syncStockForSale(pid, patch.quantitySold||existing.quantitySold, patch.attributedTo, patch.saleDate||existing.saleDate, existing.id, existing.id)
             .then(function(){ if (justDelivered) return markSaleReceived(existing.id); });
         } else {
           addSale(patch).then(function(ref){
