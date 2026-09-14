@@ -2125,26 +2125,35 @@
       chain = chain.then(function(){
         return upsertProductForCSV(rec.itemId, rec.title).then(function(pid){
           var existing = findByOrderNumber(rec.orderNumber);
-          // Marks this sale as CSV-verified so a later OCR re-scan of the same order (see
-          // finishSave in submit-scan-review) knows not to overwrite these fields with a less
-          // reliable guess — Jon's explicit call: this data source takes priority whenever the
-          // two disagree, permanently, not just at the moment of this one import.
-          var patch = { productId: pid, orderNumber: rec.orderNumber, csvVerified: true };
-          if (rec.buyerName) patch.buyerName = rec.buyerName;
-          if (rec.quantitySold) patch.quantitySold = rec.quantitySold;
-          if (rec.saleDate) patch.saleDate = rec.saleDate;
-          if (rec.salesRecordNo) patch.salesRecordNo = rec.salesRecordNo;
-          if (rec.soldFor != null) patch.soldPrice = rec.soldFor;
-          if (rec.subtotal != null) patch.soldPrice = rec.subtotal;
-          if (rec.netProfit != null) patch.netProfit = rec.netProfit;
-          if (rec.lifecycleStatus) patch.lifecycleStatus = rec.lifecycleStatus;
+          // Tracks WHICH fields this import actually verified, per field — not a single
+          // all-or-nothing flag — because the two report types cover different subsets (the
+          // Orders Report alone never provides netProfit/lifecycleStatus at all). A sale touched
+          // only by the Orders Report must still let a later real OCR scan fill in its net
+          // profit; only fields a CSV genuinely provided should ever be protected from being
+          // overwritten by a less-reliable OCR guess (see finishSave in submit-scan-review).
+          // Jon's explicit call: CSV data takes priority whenever it disagrees with OCR, for
+          // whichever fields it actually covers — permanently, not just at import time.
+          var patch = { productId: pid, orderNumber: rec.orderNumber };
+          var touchedFields = ["productId", "orderNumber"];
+          if (rec.buyerName){ patch.buyerName = rec.buyerName; touchedFields.push("buyerName"); }
+          if (rec.quantitySold){ patch.quantitySold = rec.quantitySold; touchedFields.push("quantitySold"); }
+          if (rec.saleDate){ patch.saleDate = rec.saleDate; touchedFields.push("saleDate"); }
+          if (rec.salesRecordNo){ patch.salesRecordNo = rec.salesRecordNo; touchedFields.push("salesRecordNo"); }
+          if (rec.soldFor != null){ patch.soldPrice = rec.soldFor; touchedFields.push("soldPrice"); }
+          if (rec.subtotal != null){ patch.soldPrice = rec.subtotal; touchedFields.push("soldPrice"); }
+          if (rec.netProfit != null){ patch.netProfit = rec.netProfit; touchedFields.push("netProfit"); }
+          if (rec.lifecycleStatus){ patch.lifecycleStatus = rec.lifecycleStatus; touchedFields.push("lifecycleStatus"); }
           var finalDate = patch.saleDate || (existing && existing.saleDate) || todayISO();
           if (existing){
+            var mergedFields = (existing.csvFields || []).slice();
+            touchedFields.forEach(function(f){ if (mergedFields.indexOf(f) === -1) mergedFields.push(f); });
+            patch.csvFields = mergedFields;
             updated++;
             return updateSale(existing.id, patch).then(function(){
               return syncStockForSale(pid, patch.quantitySold||existing.quantitySold, existing.attributedTo, finalDate, existing.id, existing.id);
             });
           } else {
+            patch.csvFields = touchedFields;
             created++;
             patch.attributedTo = suggestOwner(pid);
             patch.lifecycleStatus = patch.lifecycleStatus || "pending";
@@ -3285,14 +3294,18 @@
         // CSV import (Orders Report / Transaction report) is the most trustworthy data source in
         // this app — exact, structured, straight from eBay's backend — versus this OCR pass,
         // exactly the kind of digit-loss/fuzzy-match-prone read CSV import exists to route
-        // around. Jon's explicit call: once a sale has been touched by a CSV import
-        // (existing.csvVerified), a later OCR re-scan must not silently regress its "hard" data
-        // fields back to a less reliable guess. Screenshots, notes/alerts, funds status, and
-        // attributedTo (a manual choice either way, not an OCR read) still update normally.
-        if (existing && existing.csvVerified){
-          delete patch.productId; delete patch.quantitySold; delete patch.saleDate;
-          delete patch.netProfit; delete patch.soldPrice; delete patch.buyerName;
-          delete patch.orderNumber; delete patch.salesRecordNo;
+        // around. Jon's explicit call: once a FIELD has been verified by a CSV import, a later
+        // OCR re-scan must not silently regress it back to a less reliable guess. This checks
+        // PER FIELD (existing.csvFields), not "was this sale ever touched by any CSV at all" —
+        // the Orders Report alone never provides netProfit/lifecycleStatus, so an order only
+        // covered by that report (not yet by a Transaction report) must still let a real OCR
+        // scan fill in its net profit; only fields a CSV genuinely provided get protected.
+        // Screenshots, notes/alerts, and attributedTo (a manual choice either way, not an OCR
+        // read) always update normally regardless.
+        if (existing && existing.csvFields && existing.csvFields.length){
+          ["productId","quantitySold","saleDate","netProfit","soldPrice","buyerName","orderNumber","salesRecordNo"].forEach(function(f){
+            if (existing.csvFields.indexOf(f) !== -1) delete patch[f];
+          });
         }
         // If this scan's OCR text found a real "Delivered on <date>" line (a signal already
         // proven against a real order this session — see the Newgate order throughout this
