@@ -2223,6 +2223,12 @@
           if (rec.netProfit != null){ patch.netProfit = rec.netProfit; touchedFields.push("netProfit"); }
           if (rec.lifecycleStatus){ patch.lifecycleStatus = rec.lifecycleStatus; touchedFields.push("lifecycleStatus"); }
           var finalDate = patch.saleDate || (existing && existing.saleDate) || todayISO();
+          // eBay's own report saying either "this shipped on <date>" (Orders Report) or "funds
+          // are available, no hold" (Transaction report -> lifecycleStatus "completed") is proof
+          // straight from eBay's backend that the item was already in hand — same reasoning as
+          // submit-scan-review's OCR "Delivered on" / funds-completed check, just sourced from a
+          // CSV instead of a screenshot.
+          var csvInHand = !!rec.shippedOnDate || patch.lifecycleStatus === "completed";
           if (existing){
             var mergedFields = (existing.csvFields || []).slice();
             touchedFields.forEach(function(f){ if (mergedFields.indexOf(f) === -1) mergedFields.push(f); });
@@ -2230,6 +2236,8 @@
             updated++;
             return updateSale(existing.id, patch).then(function(){
               return syncStockForSale(pid, patch.quantitySold||existing.quantitySold, existing.attributedTo, finalDate, existing.id, existing.id);
+            }).then(function(){
+              if (csvInHand) return markSaleReceived(existing.id);
             });
           } else {
             patch.csvFields = touchedFields;
@@ -2248,7 +2256,9 @@
               // which is exactly why it went undetected until a Node test exercised the offline
               // path directly — but excluding its own id is correct and harmless either way, so
               // there's no reason to depend on that timing at all.
-              return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, finalDate, sid, sid);
+              return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, finalDate, sid, sid).then(function(){
+                if (csvInHand) return markSaleReceived(sid);
+              });
             });
           }
         });
@@ -3339,6 +3349,9 @@
       var addQty = Number($("#f_qty").value)||1;
       var addDate = $("#f_date").value || todayISO();
       var addWho = $("#f_who").value;
+      // Captured now, not re-read inside the .then() below -- closeModal() runs synchronously
+      // right after this, so by the time that callback fires #f_funds no longer exists in the DOM.
+      var addFundsVal = $("#f_funds").value;
       addSale({
         productId: pid2, quantitySold: addQty,
         saleDate: addDate, netProfit: Number(profit)||0,
@@ -3346,13 +3359,20 @@
         attributedTo: addWho, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
-        lifecycleStatus: $("#f_funds").value
+        lifecycleStatus: addFundsVal
       }).then(function(ref){
         var newSaleId = ref && ref.id ? ref.id : ref;
         // excludeSaleId = its own id, not null — see the matching comment in importCSVRecords
         // for why: the offline/local fallback path adds this sale to state.sales synchronously,
         // before this callback runs, so excluding anything else risks double-counting it.
-        syncStockForSale(pid2, addQty, addWho, addDate, newSaleId, newSaleId);
+        syncStockForSale(pid2, addQty, addWho, addDate, newSaleId, newSaleId).then(function(){
+          // eBay only ever releases payout once an item has shipped and been delivered — funds
+          // status "Completed" is exactly as hard a proof of "already in hand" as the OCR
+          // "Delivered on" signal submit-scan-review already acts on (see markSaleReceived's own
+          // comment), so recording a sale as already paid out shouldn't also require a separate
+          // manual "Mark received" click on top of that.
+          if (addFundsVal === "completed") return markSaleReceived(newSaleId);
+        });
       });
       toast("Sale recorded");
       closeModal();
@@ -3365,6 +3385,7 @@
       var editQty = Number($("#f_qty").value)||1;
       var editDate = $("#f_date").value || todayISO();
       var editWho = $("#f_who").value;
+      var editFundsVal = $("#f_funds").value;
       updateSale(sid, {
         productId: editPid, quantitySold: editQty,
         saleDate: editDate, netProfit: Number($("#f_profit").value)||0,
@@ -3372,9 +3393,13 @@
         attributedTo: editWho, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
-        lifecycleStatus: $("#f_funds").value
+        lifecycleStatus: editFundsVal
       });
-      syncStockForSale(editPid, editQty, editWho, editDate, sid, sid);
+      syncStockForSale(editPid, editQty, editWho, editDate, sid, sid).then(function(){
+        // Same reasoning as submit-add-sale above: a payout marked "Completed" here (including
+        // editing an OLDER sale up to that status after the fact) is proof enough on its own.
+        if (editFundsVal === "completed") return markSaleReceived(sid);
+      });
       toast("Sale updated");
       closeModal();
       return;
@@ -3430,7 +3455,11 @@
         // happen after Jon actually had it in hand. Skip straight to "received" instead of
         // making him click a separate button for the exact case he described: re-scan the
         // updated order page once it ships, and let the app figure out the rest from there.
-        var justDelivered = !!ctx.deliveredDate;
+        // A funds status of "Completed" is the same kind of proof, whether the OCR read it off
+        // the page or it's what he picked in the dropdown here himself — eBay never releases
+        // payout before an item has shipped and been delivered, so "already got paid" is at
+        // least as hard evidence of "already in hand" as a literal "Delivered on" line is.
+        var alreadyInHand = !!ctx.deliveredDate || fundsVal === "completed";
         if (existing){
           updateSale(existing.id, patch);
           toast("Order updated");
@@ -3438,7 +3467,7 @@
           // back to the existing sale's own values so this doesn't undercount its contribution
           // to the product's total committed stock.
           syncStockForSale(pid, patch.quantitySold||existing.quantitySold, patch.attributedTo, patch.saleDate||existing.saleDate, existing.id, existing.id)
-            .then(function(){ if (justDelivered) return markSaleReceived(existing.id); });
+            .then(function(){ if (alreadyInHand) return markSaleReceived(existing.id); });
         } else {
           addSale(patch).then(function(ref){
             var newSaleId = ref && ref.id ? ref.id : ref;
@@ -3447,7 +3476,7 @@
             // state.sales synchronously, before this callback runs, so excluding anything else
             // risks double-counting it.
             return syncStockForSale(pid, patch.quantitySold, patch.attributedTo, patch.saleDate, newSaleId, newSaleId)
-              .then(function(){ if (justDelivered) return markSaleReceived(newSaleId); });
+              .then(function(){ if (alreadyInHand) return markSaleReceived(newSaleId); });
           });
           toast("Order saved");
         }
