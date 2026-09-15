@@ -968,7 +968,11 @@
     // misreading its underscore as a space). It's also strictly more useful for spotting
     // duplicate orders — usernames are permanent and unique per account; two different real
     // buyers can share the same display name, but never the same username.
-    var userRe = /\b([a-zA-Z][a-zA-Z0-9_.\-]{2,39})\s*\((?:\d+|[a-zA-Z]{1,4})\)/g;
+    // First character allows a digit too -- eBay usernames commonly start
+    // with a number (e.g. "999ash999"); a letter-only anchor here silently
+    // fails to match a fully clean, correctly-OCR'd digit-led username, not
+    // just a misread one.
+    var userRe = /\b([a-zA-Z0-9][a-zA-Z0-9_.\-]{2,39})\s*\((?:\d+|[a-zA-Z]{1,4})\)/g;
     // eBay usernames often end "_NN" (e.g. "cancerv_96") and OCR frequently reads that
     // underscore as a plain space ("cancerv 96") — reconstruct it when we see the shape
     // <word><space><digits> immediately followed by the feedback-count parenthetical.
@@ -982,7 +986,7 @@
       // eBay usernames are always displayed lowercase, so anything else here is OCR
       // over-capitalizing a link/button-styled piece of text (e.g. "Jerenx" for "jerenx") —
       // normalize on extraction rather than carrying the wrong case into the ledger.
-      var m = str.match(/\b([a-zA-Z][a-zA-Z0-9.\-]{1,25})[ _](\d{1,4})\s*\((?:\d+|[a-zA-Z]{1,4})\)/);
+      var m = str.match(/\b([a-zA-Z0-9][a-zA-Z0-9.\-]{1,25})[ _](\d{1,4})\s*\((?:\d+|[a-zA-Z]{1,4})\)/);
       if (m) return (m[1] + "_" + m[2]).toLowerCase();
       // A username can contain MULTIPLE underscores, and OCR can misread each one of them
       // independently — some read correctly (staying part of the same word, e.g. "tog_with"),
@@ -1003,7 +1007,14 @@
         var words = beforeParen.split(/\s+/);
         var collected = [];
         for (var wi = words.length - 1; wi >= 0; wi--){
-          if (/^[a-z][a-z0-9_.\-]*$/.test(words[wi])) collected.unshift(words[wi]);
+          // A bare all-digit word (e.g. "14" from a "Sep 14" date sitting in
+          // this same window) must NOT be swept in here even though a
+          // digit-led username fragment is otherwise allowed -- a real
+          // username always has at least one letter in it somewhere, and the
+          // one legitimate all-digit fragment (a trailing "_NN" suffix) is
+          // already caught by the dedicated regex above before this backward
+          // walk ever runs.
+          if (/^[a-z0-9][a-z0-9_.\-]*$/.test(words[wi]) && /[a-z]/.test(words[wi])) collected.unshift(words[wi]);
           else break;
         }
         if (collected.length >= 2){ buyerUsernameLowConfidence = true; return collected.join("_").toLowerCase(); }
@@ -2783,6 +2794,9 @@
     if (!file) return;
     if (!assetsCap){ toast("Screenshot storage isn't set up in this view — use Record sale instead."); return; }
 
+    scanState = { active:true, label:"Uploading screenshot…" };
+    render();
+
     var uploaded;
     try {
       uploaded = await assetsCap.upload(file);
@@ -2802,10 +2816,14 @@
           assetsCap = makeStorageAdapter(firebase.storage(), freshCred.user.uid);
           uploaded = await assetsCap.upload(file);
         } catch(e2){
+          scanState = { active:false, label:"" };
+          render();
           toast("Couldn't store that screenshot ("+(e2&&e2.code||"error")+") — try reloading the page.");
           return;
         }
       } else {
+        scanState = { active:false, label:"" };
+        render();
         toast("Couldn't store that screenshot ("+(e&&e.code||"error")+")");
         return;
       }
@@ -3514,7 +3532,12 @@
       var importUrl = params.get("import");
       if (!importUrl) return;
       var name = params.get("name") || "import";
-      toast("Fetching the file from Discord…");
+      // scanState (not a toast) -- it's the same persistent spinner+label
+      // strip scanScreenshot() itself uses, so this stays visible with no
+      // gap all the way through fetch -> re-upload -> OCR, instead of a
+      // toast that self-dismisses in 2.6s while the fetch is still going.
+      scanState = { active:true, label:"Fetching the file from Discord…" };
+      render();
       var resp = await fetch(importUrl);
       if (!resp.ok) throw new Error("fetch failed: " + resp.status);
       var blob = await resp.blob();
@@ -3525,6 +3548,8 @@
       history.replaceState(null, "", location.pathname);
     } catch(e){
       console.warn("Auto-import from Discord link failed", e);
+      scanState = { active:false, label:"" };
+      render();
       toast("Couldn't auto-load that file — try dragging it in manually instead.");
     }
   }
