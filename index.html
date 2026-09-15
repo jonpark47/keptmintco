@@ -483,9 +483,16 @@
       gzip: true,
       logger: function(m){
         if (m && m.status){
+          // renderScanOverlay(), not render() -- this fires many times a
+          // second while Tesseract is actually recognizing text, and the
+          // full render() rebuilds the entire page behind the overlay (plus
+          // repaints every icon) on every single call. That was the real
+          // source of the "flashing" -- the overlay itself had already
+          // stopped remounting, but everything behind its blur was still
+          // being torn down and rebuilt at that same rapid rate.
           var pct = m.progress!=null ? " "+Math.round(m.progress*100)+"%" : "";
           scanState = { active:true, label: tessLabelFor(m.status)+pct };
-          render();
+          renderScanOverlay();
         }
       }
     });
@@ -2859,7 +2866,7 @@
     if (!assetsCap){ toast("Screenshot storage isn't set up in this view — use Record sale instead."); return; }
 
     scanState = { active:true, label:"Uploading screenshot…" };
-    render();
+    renderScanOverlay();
 
     var uploaded;
     try {
@@ -2894,13 +2901,13 @@
     }
 
     scanState = { active:true, label:"Starting OCR engine…" };
-    render();
+    renderScanOverlay();
 
     var extracted = null, reviewFlags = [], confidenceA = null;
     try {
       var worker = await getTessWorker();
       scanState = { active:true, label:"Reading screenshot…" };
-      render();
+      renderScanOverlay();
       var imgA = await preprocessForOCR(file, "sharp");
       // Requesting `blocks: true` alongside the default text also returns line-level bounding
       // boxes — needed below for the targeted order-number re-read. This doesn't cost a
@@ -2929,7 +2936,7 @@
         var lineBbox = findOrderNumberLineBbox(resultA.data);
         if (lineBbox){
           scanState = { active:true, label:"Zooming in on the order number for a cleaner read…" };
-          render();
+          renderScanOverlay();
           var cropBlob = await cropAndUpscale(imgA, lineBbox, 5);
           if (cropBlob){
             var cropResult = await worker.recognize(cropBlob);
@@ -2977,7 +2984,7 @@
       var mainTitle = extracted && extracted.items[0] ? extracted.items[0].title : null;
       if (extracted && !mainTitle){
         scanState = { active:true, label:"Zooming in on the item title for a cleaner read…" };
-        render();
+        renderScanOverlay();
         var titleBbox = findTitleLineBbox(resultA.data, /^order details\b/i) || findTitleLineBbox(resultA.data, /^items?\b/i);
         var zoomedTitle = await zoomField(titleBbox, 3, function(r){ return r.items[0] ? r.items[0].title : null; });
         // Since this only runs when there was NOTHING before, almost anything is an
@@ -3006,7 +3013,7 @@
       // skip just because the first read looked clean enough not to double-check).
       {
         scanState = { active:true, label:"Zooming in on the buyer username for a cleaner read…" };
-        render();
+        renderScanOverlay();
         var buyerBboxLines = flattenLines(resultA.data);
         var buyerAnchorIdx = -1;
         for (var uai=0; uai<buyerBboxLines.length; uai++){
@@ -3049,7 +3056,7 @@
         }
         if (extracted && extracted.items[0] && itemIdBbox){
           scanState = { active:true, label:"Zooming in on the item ID for a cleaner read…" };
-          render();
+          renderScanOverlay();
           var zoomedItemId = await zoomField(itemIdBbox, 5, function(r){ return r.items[0] ? r.items[0].itemId : null; });
           if (!mainItemId){
             if (zoomedItemId) extracted.items[0].itemId = zoomedItemId;
@@ -3087,7 +3094,7 @@
       if (extracted && extracted.earningsConflict){
         var conflict = extracted.earningsConflict;
         scanState = { active:true, label:"Zooming in on Order earnings for a cleaner read…" };
-        render();
+        renderScanOverlay();
         var earningsLines = flattenLines(resultA.data);
         var earningsBbox = null;
         for (var eli=0; eli<earningsLines.length; eli++){
@@ -3101,7 +3108,7 @@
           extracted.earningsConflict = null;
         } else {
           scanState = { active:true, label:"Zooming in on selling costs for a cleaner read…" };
-          render();
+          renderScanOverlay();
           var feeLines = flattenLines(resultA.data);
           function findFeeLineBbox(labelRe){
             for (var fli=0; fli<feeLines.length; fli++){ if (labelRe.test(feeLines[fli].text||"")) return feeLines[fli].bbox; }
@@ -3144,7 +3151,7 @@
       // substitution makes "Order total = Subtotal + Shipping + Sales tax" balance again.
       if (extracted && extracted.subtotalConflict){
         scanState = { active:true, label:"Zooming in on the payment breakdown for a cleaner read…" };
-        render();
+        renderScanOverlay();
         var payLines = flattenLines(resultA.data);
         function findMoneyLineBbox(labelRe){
           for (var pli=0; pli<payLines.length; pli++){ if (labelRe.test(payLines[pli].text||"")) return payLines[pli].bbox; }
@@ -3188,7 +3195,7 @@
       var extractedB = null, confidenceB = null;
       try {
         scanState = { active:true, label:"Double-checking with a second independent read…" };
-        render();
+        renderScanOverlay();
         var imgB = await preprocessForOCR(file, "threshold");
         var resultB = await worker.recognize(imgB);
         extractedB = parseOrderText(resultB.data.text || "");
@@ -3601,7 +3608,7 @@
       // gap all the way through fetch -> re-upload -> OCR, instead of a
       // toast that self-dismisses in 2.6s while the fetch is still going.
       scanState = { active:true, label:"Fetching the file from Discord…" };
-      render();
+      renderScanOverlay();
       var resp = await fetch(importUrl);
       if (!resp.ok) throw new Error("fetch failed: " + resp.status);
       var blob = await resp.blob();
