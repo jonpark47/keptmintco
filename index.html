@@ -277,13 +277,45 @@
   .dropzone .ic{ display:flex; justify-content:center; color:var(--accent); margin-bottom:10px; }
   .dropzone .ic svg{ width:30px; height:30px; }
   .dropzone .lead{ font-weight:600; font-size:15px; }
-  .scan-progress{
-    display:flex; align-items:center; gap:10px; background:var(--accent-soft); color:var(--accent);
-    border-radius:12px; padding:11px 16px; margin-bottom:16px; font-size:13.5px; font-weight:600;
-  }
   .spinner{ width:14px; height:14px; border-radius:50%; border:2px solid currentColor; border-top-color:transparent; animation:spin .7s linear infinite; flex:0 0 auto; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
   @media (prefers-reduced-motion: reduce){ .spinner{ animation:none; } }
+
+  /* Full-screen import/OCR progress -- deliberately blocking (like a page-load
+     screen), since this covers a fully automatic background sequence with
+     nothing for the user to do but wait; it's driven by the same scanState
+     every scan/upload stage already sets, and lives outside #main so it stays
+     up across a tab switch instead of disappearing when #main re-renders. */
+  .scan-overlay{
+    position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center;
+    padding:20px; background:rgba(0,0,0,.45); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    animation:scanOverlayIn .2s ease-out;
+  }
+  @keyframes scanOverlayIn{ from{ opacity:0; } to{ opacity:1; } }
+  .scan-overlay-card{
+    display:flex; flex-direction:column; align-items:center; text-align:center; gap:18px;
+    width:100%; max-width:300px; background:var(--surface); border-radius:20px;
+    padding:38px 30px 32px; box-shadow:0 24px 70px -14px rgba(0,0,0,.45);
+  }
+  .scan-overlay-ring{
+    width:44px; height:44px; border-radius:50%; flex:0 0 auto;
+    border:3.5px solid var(--accent-soft); border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+  }
+  .scan-overlay-copy{ display:flex; flex-direction:column; gap:7px; }
+  .scan-overlay-label{ font-size:15px; font-weight:600; line-height:1.35; color:var(--ink); }
+  .scan-overlay-sub{ font-size:12.5px; line-height:1.4; color:var(--muted); }
+  .scan-overlay-bar{ width:100%; height:4px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .scan-overlay-bar span{
+    display:block; height:100%; width:35%; border-radius:99px; background:var(--accent);
+    animation:scanOverlayBar 1.15s ease-in-out infinite;
+  }
+  @keyframes scanOverlayBar{ 0%{ transform:translateX(-110%); } 100%{ transform:translateX(310%); } }
+  @media (prefers-reduced-motion: reduce){
+    .scan-overlay{ animation:none; }
+    .scan-overlay-ring{ animation:none; border-top-color:var(--accent); }
+    .scan-overlay-bar span{ animation:none; width:100%; }
+  }
 
   .order-row{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; padding:13px 16px; border-bottom:1px solid var(--border); }
   .order-row:last-child{ border-bottom:none; }
@@ -409,6 +441,7 @@
 <div id="modalRoot"></div>
 <div id="lightboxRoot"></div>
 <div id="toastRoot"></div>
+<div id="scanOverlayRoot"></div>
 <input type="file" id="scanFileInput" accept="image/*,.csv,text/csv" style="display:none;">
 
 <script>
@@ -2277,6 +2310,24 @@
     else if (tab==="sales") main.innerHTML = renderSales();
     else if (tab==="settlements") main.innerHTML = renderSettlements();
     paintIcons();
+    renderScanOverlay();
+  }
+
+  // Full-screen, so it stays visible no matter which tab is open -- reads
+  // straight off scanState, same one every fetch/upload/OCR stage already
+  // updates, so nothing here needs its own progress tracking.
+  function renderScanOverlay(){
+    var root = $("#scanOverlayRoot");
+    if (!scanState.active){ root.innerHTML=""; return; }
+    root.innerHTML =
+      "<div class='scan-overlay'><div class='scan-overlay-card'>"+
+        "<span class='scan-overlay-ring'></span>"+
+        "<div class='scan-overlay-copy'>"+
+          "<div class='scan-overlay-label'>"+esc(scanState.label||"Importing…")+"</div>"+
+          "<div class='scan-overlay-sub'>Reading your order screenshot — this takes a few seconds.</div>"+
+        "</div>"+
+        "<div class='scan-overlay-bar'><span></span></div>"+
+      "</div></div>";
   }
 
   function renderReviewBanner(){
@@ -2420,9 +2471,9 @@
   function renderOrders(){
     var html = "";
     var canUpload = !!assetsCap;
-    if (scanState.active){
-      html += "<div class='scan-progress'><span class='spinner'></span> "+esc(scanState.label||"Reading order details…")+"</div>";
-    }
+    // scanState's own progress is shown by the full-screen scan overlay
+    // (see renderScanOverlay()) instead of an inline bar here now -- it
+    // needs to be visible no matter which tab is open, not just this one.
     if (canUpload){
       html += "<div class='dropzone' id='dropzone' data-action='open-file-picker'>"+
         "<div class='ic' data-icon='camera'></div><div class='lead'>Drop a screenshot or eBay CSV here, or tap to choose one</div>"+
