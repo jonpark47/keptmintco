@@ -3500,6 +3500,35 @@
     };
   }
 
+  // Discord "#ebay" channel drop-zone integration (2026-09-15): a bot posts
+  // whatever CSV/screenshot Jon or Jax drops in that channel to Firebase
+  // Storage and replies with a link back here carrying ?import=<url>&name=
+  // <original filename>. Reuses handleDroppedFile() as-is -- same CSV vs.
+  // screenshot dispatch, same importCSV/scanScreenshot logic, same review
+  // modal for screenshots -- so nothing about how an import is actually
+  // matched/merged/reviewed lives anywhere but here. Discord's own side
+  // never re-implements any of that; it just gets a file to a URL.
+  async function tryAutoImportFromQuery(){
+    try {
+      var params = new URLSearchParams(location.search);
+      var importUrl = params.get("import");
+      if (!importUrl) return;
+      var name = params.get("name") || "import";
+      toast("Fetching the file from Discord…");
+      var resp = await fetch(importUrl);
+      if (!resp.ok) throw new Error("fetch failed: " + resp.status);
+      var blob = await resp.blob();
+      var file = new File([blob], name, { type: blob.type });
+      handleDroppedFile(file);
+      // Strip the query string so refreshing this tab later doesn't
+      // re-trigger the same import a second time.
+      history.replaceState(null, "", location.pathname);
+    } catch(e){
+      console.warn("Auto-import from Discord link failed", e);
+      toast("Couldn't auto-load that file — try dragging it in manually instead.");
+    }
+  }
+
   async function boot(){
     try {
       if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -3507,6 +3536,7 @@
       db = firebase.firestore();
       assetsCap = makeStorageAdapter(firebase.storage(), cred.user.uid);
       subscribeCollections();
+      tryAutoImportFromQuery();
     } catch(e){
       console.warn("Firebase init failed", e);
       db = null; assetsCap = null;
