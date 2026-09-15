@@ -2314,11 +2314,24 @@
   }
 
   // Full-screen, so it stays visible no matter which tab is open -- reads
-  // straight off scanState, same one every fetch/upload/OCR stage already
+  // straight off scanState, same one every fetch/upload/OCR stage (and CSV
+  // import, and Tesseract's own per-percent progress callback -- easily
+  // dozens of calls a second while it's actually recognizing text) already
   // updates, so nothing here needs its own progress tracking.
   function renderScanOverlay(){
     var root = $("#scanOverlayRoot");
     if (!scanState.active){ root.innerHTML=""; return; }
+    var label = root.querySelector(".scan-overlay-label");
+    if (label){
+      // Overlay is already mounted -- just swap the text. Rebuilding the
+      // whole thing on every single scanState update (as this used to)
+      // restarted its fade-in and repainted the blurred backdrop every
+      // time, which with Tesseract calling render() dozens of times a
+      // second showed up as a rapid strobe/flash instead of one steady
+      // screen with the spinner and bar animating smoothly underneath.
+      label.textContent = scanState.label || "Importing…";
+      return;
+    }
     root.innerHTML =
       "<div class='scan-overlay'><div class='scan-overlay-card'>"+
         "<span class='scan-overlay-ring'></span>"+
