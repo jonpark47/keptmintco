@@ -164,6 +164,7 @@
   .owner-queue-head b{ font-weight:650; }
   .owner-queue-list{ display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
   .owner-queue-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border-radius:10px; padding:8px 10px; }
+  .owner-queue-row .amt{ flex:0 0 4.6rem; font-size:16px; font-weight:650; font-variant-numeric:tabular-nums; }
   .owner-queue-row .what{ flex:1 1 auto; min-width:0; font-size:13.5px; }
   .owner-queue-row .what span{ display:block; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .owner-queue-row .who{ display:flex; gap:6px; flex:0 0 auto; }
@@ -2388,13 +2389,13 @@
     var box = $("#ownerBanner");
     var list = needsOwnerSales();
     if (!list.length){ box.innerHTML = ""; return; }
-    var rows = list.slice().sort(function(a,b){ return (a.saleDate<b.saleDate)?1:-1; }).map(function(s){
+    var rows = list.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
       var p = productById(s.productId);
-      return "<div class='owner-queue-row'><div class='what'>"+esc(p?p.name:"—")+"<span>"+esc(s.buyerName||"")+" · "+fmtDate(s.saleDate)+" · profit "+money(s.netProfit)+"</span></div>"+
+      return "<div class='owner-queue-row'><div class='amt'>"+money(s.netProfit)+"</div><div class='what'>"+esc(p?p.name:"—")+"<span>"+esc(s.buyerName||"")+" · "+fmtDate(s.saleDate)+"</span></div>"+
         "<div class='who'><button class='btn small' data-action='assign-owner' data-who='Jon' data-id='"+s.id+"'>Jon</button>"+
         "<button class='btn small' data-action='assign-owner' data-who='Jax' data-id='"+s.id+"'>Jax</button></div></div>";
     }).join("");
-    box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — tap who gets each one</span>"+
+    box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — highest profit first</span>"+
       "<span><button class='btn small ghost' data-action='assign-all-owner' data-who='Jon'>All to Jon</button> <button class='btn small ghost' data-action='assign-all-owner' data-who='Jax'>All to Jax</button></span></div>"+
       "<div class='owner-queue-list'>"+rows+"</div></div>";
   }
