@@ -159,6 +159,17 @@
     padding:6px 12px; border-radius:8px; font-size:12.5px; font-weight:600; cursor:pointer;
     white-space:nowrap; box-shadow:var(--shadow);
   }
+  .owner-queue{ background:var(--warn-soft); border-radius:var(--radius); padding:12px 14px; margin-bottom:14px; }
+  .owner-queue-head{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; justify-content:space-between; margin-bottom:8px; font-size:14px; }
+  .owner-queue-head b{ font-weight:650; }
+  .owner-queue-list{ display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+  .owner-queue-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border-radius:10px; padding:8px 10px; }
+  .owner-queue-row .what{ flex:1 1 auto; min-width:0; font-size:13.5px; }
+  .owner-queue-row .what span{ display:block; color:var(--muted); font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .owner-queue-row .who{ display:flex; gap:6px; flex:0 0 auto; }
+  button.badge{ border:0; cursor:pointer; font:inherit; }
+  button.badge:hover{ filter:brightness(.94); }
+  .badge.owner-none{ background:var(--warn-soft); color:var(--warn); }
   .banner.info{ background:var(--accent-soft); }
   .banner.info .ic{ color:var(--accent); }
   .banner.error{ background:var(--bad-soft); }
@@ -435,6 +446,7 @@
     </div>
     <div id="syncBanner"></div>
     <div id="reviewBanner"></div>
+    <div id="ownerBanner"></div>
     <div id="main"></div>
   </main>
 </div>
@@ -2319,6 +2331,7 @@
     var titles = { overview:"Overview", inventory:"Inventory", preorders:"Preorders", orders:"Orders", sales:"Sales", settlements:"Settlements" };
     $("#pageTitle").innerHTML = "<h1>"+titles[tab]+"</h1>";
     renderReviewBanner();
+    renderOwnerBanner();
     var main = $("#main");
     if (tab==="overview") main.innerHTML = renderOverview();
     else if (tab==="inventory") main.innerHTML = renderInventory();
@@ -2366,6 +2379,46 @@
     if (!n){ b.innerHTML=""; return; }
     b.innerHTML = "<div class='banner'><span class='ic' data-icon='warning'></span><span>"+n+" batch"+(n>1?"es":"")+" "+(n>1?"were":"was")+" auto-added to cover a sale and need"+(n>1?"":"s")+" a real purchase cost filled in (defaulted to $0).</span>"+
       "<button data-action='goto-inventory'>Review in Inventory</button></div>";
+  }
+
+  // eBay-synced sales the server couldn't attribute on its own (no purchase history for that
+  // item, so it won't guess who gets the profit) sit here until someone taps Jon or Jax.
+  function needsOwnerSales(){ return state.sales.filter(function(s){ return !s.attributedTo; }); }
+  function renderOwnerBanner(){
+    var box = $("#ownerBanner");
+    var list = needsOwnerSales();
+    if (!list.length){ box.innerHTML = ""; return; }
+    var rows = list.slice().sort(function(a,b){ return (a.saleDate<b.saleDate)?1:-1; }).map(function(s){
+      var p = productById(s.productId);
+      return "<div class='owner-queue-row'><div class='what'>"+esc(p?p.name:"—")+"<span>"+esc(s.buyerName||"")+" · "+fmtDate(s.saleDate)+" · profit "+money(s.netProfit)+"</span></div>"+
+        "<div class='who'><button class='btn small' data-action='assign-owner' data-who='Jon' data-id='"+s.id+"'>Jon</button>"+
+        "<button class='btn small' data-action='assign-owner' data-who='Jax' data-id='"+s.id+"'>Jax</button></div></div>";
+    }).join("");
+    box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — tap who gets each one</span>"+
+      "<span><button class='btn small ghost' data-action='assign-all-owner' data-who='Jon'>All to Jon</button> <button class='btn small ghost' data-action='assign-all-owner' data-who='Jax'>All to Jax</button></span></div>"+
+      "<div class='owner-queue-list'>"+rows+"</div></div>";
+  }
+  function assignOwner(saleId, who){
+    var s = state.sales.find(function(x){ return x.id===saleId; });
+    if (!s) return Promise.resolve();
+    return Promise.resolve(updateSale(saleId, { attributedTo: who, needsOwner: false, ownerSource: "manual" })).then(function(){
+      // Stock is deliberately not touched until now -- the batch that covers this sale needs an
+      // owner, so it's created here (same syncStockForSale every other sale uses), and a sale eBay
+      // already shows as shipped flips its stock to received the same way "Completed" does.
+      return syncStockForSale(s.productId, s.quantitySold, who, s.saleDate, saleId, saleId);
+    }).then(function(){ if (s.ebayShipped) return markSaleReceived(saleId); });
+  }
+  function flipOwner(saleId){
+    var s = state.sales.find(function(x){ return x.id===saleId; });
+    if (!s || !s.attributedTo) return;
+    var who = s.attributedTo==="Jon" ? "Jax" : "Jon";
+    updateSale(saleId, { attributedTo: who, ownerSource: "manual" });
+    batchesForSale(saleId).forEach(function(b){ updateBatch(b.id, { owner: who }); });
+    toast("Now goes to "+who+" — tap again to switch back");
+  }
+  function ownerBadge(s){
+    if (!s.attributedTo) return "<span class='badge owner-none'>Unassigned</span>";
+    return "<button type='button' class='badge owner-"+s.attributedTo+"' data-action='flip-owner' data-id='"+s.id+"' title='Tap to give this sale to "+(s.attributedTo==="Jon"?"Jax":"Jon")+"'>"+s.attributedTo+"</button>";
   }
 
   function renderOverview(){
@@ -2487,7 +2540,7 @@
       var statusBadge = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
       html += "<tr><td data-label='Date'>"+fmtDate(s.saleDate)+"</td><td data-label='Item'><div>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</div></td>"+
         "<td data-label='Buyer'>"+esc(s.buyerName||"—")+"</td><td class='num-cell' data-label='Qty'>"+s.quantitySold+"</td><td class='num-cell' data-label='Net profit'>"+money(s.netProfit)+"</td>"+
-        "<td data-label='Goes to'><span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></td><td data-label='Status'>"+statusBadge+"</td>"+
+        "<td data-label='Goes to'>"+ownerBadge(s)+"</td><td data-label='Status'>"+statusBadge+"</td>"+
         "<td data-label='Actions'><div class='row-actions'>"+
           (s.screenshots&&s.screenshots.length ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
           "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
@@ -2538,7 +2591,7 @@
             "<img class='order-thumb' src='"+esc(shot.id)+"' alt=''>"+
             "<div class='order-main'>"+
               "<div class='order-buyer'>"+esc(s.buyerName||"Unknown buyer")+"</div>"+
-              "<div class='order-sub'>"+esc(p?p.name:"—")+(s.orderNumber?" · #"+esc(s.orderNumber):"")+" · "+money(s.netProfit)+" → <span class='badge owner-"+s.attributedTo+"'>"+s.attributedTo+"</span></div>"+
+              "<div class='order-sub'>"+esc(p?p.name:"—")+(s.orderNumber?" · #"+esc(s.orderNumber):"")+" · "+money(s.netProfit)+" → "+ownerBadge(s)+"</div>"+
             "</div>"+
           "</div>"+
           "<div class='order-row-meta'>"+
@@ -2722,7 +2775,7 @@
       ["Item", p?p.name:"—"], ["Buyer", s.buyerName||"—"], ["Order #", s.orderNumber||"—"],
       ["Sale date", fmtDate(s.saleDate)], ["Quantity", s.quantitySold],
       ["Sold price", s.soldPrice?money(s.soldPrice):"—"], ["Net profit", money(s.netProfit)],
-      ["Goes to", s.attributedTo], ["Funds status", s.lifecycleStatus==="completed"?"Completed":"Pending payout"],
+      ["Goes to", s.attributedTo||"Unassigned"], ["Funds status", s.lifecycleStatus==="completed"?"Completed":"Pending payout"],
       ["Stock status", stockLabel]
     ];
     var kvHtml = kv.map(function(row){ return "<div>"+esc(row[0])+"</div><div>"+esc(String(row[1]))+"</div>"; }).join("");
@@ -3270,6 +3323,9 @@
       if (cb) cb();
       return;
     }
+    if (action==="assign-owner"){ assignOwner(t.dataset.id, t.dataset.who); return; }
+    if (action==="assign-all-owner"){ needsOwnerSales().forEach(function(s){ assignOwner(s.id, t.dataset.who); }); toast("All assigned to "+t.dataset.who); return; }
+    if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
 
