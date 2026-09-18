@@ -17,77 +17,50 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap" rel="stylesheet">
 <style>
   :root{
-    --bg:#f5f5f7;
+    --bg:#f4f1ff;
     --surface:#ffffff;
-    --surface-2:#f0f0f2;
-    --ink:#1d1d1f;
-    --muted:#6e6e73;
-    --border:#d8d8dc;
-    --accent:#0071e3;
+    --surface-2:#eeeafc;
+    --ink:#17133a;
+    --muted:#6a6592;
+    --border:#e2dcf7;
+    --accent:#6a45ff;
     --accent-ink:#ffffff;
-    --accent-soft:#e8f1fd;
-    --good:#248a3d;
-    --good-soft:#e3f7e9;
-    --warn:#b3690a;
-    --warn-soft:#fdf0dd;
-    --bad:#d70015;
-    --bad-soft:#fce8e7;
-    --jon:#0071e3;
-    --jon-soft:#e8f1fd;
-    --jax:#8944ab;
-    --jax-soft:#f2e8f7;
-    --shadow:0 1px 2px rgba(0,0,0,.04), 0 4px 16px -6px rgba(0,0,0,.10);
-    --radius:14px;
+    --accent-soft:#ebe6ff;
+    --good:#0a9f6e;
+    --good-soft:#d9f8ec;
+    --warn:#c2580a;
+    --warn-soft:#ffe9d2;
+    --bad:#e11d48;
+    --bad-soft:#ffe1e8;
+    --jon:#2563ff;
+    --jon-soft:#dfe8ff;
+    --jax:#e0208a;
+    --jax-soft:#ffe0f0;
+    --shadow:0 1px 2px rgba(60,30,140,.06), 0 12px 30px -14px rgba(80,50,200,.30);
+    --radius:20px;
     color-scheme: light;
   }
   @media (prefers-color-scheme: dark){
     :root:not([data-theme="light"]){
-      --bg:#000000;
-      --surface:#1c1c1e;
-      --surface-2:#2c2c2e;
-      --ink:#f5f5f7;
-      --muted:#98989d;
-      --border:#38383a;
-      --accent:#0a84ff;
-      --accent-ink:#ffffff;
-      --accent-soft:#0a2f52;
-      --good:#32d74b;
-      --good-soft:#0d3016;
-      --warn:#ff9f0a;
-      --warn-soft:#3a2705;
-      --bad:#ff453a;
-      --bad-soft:#3a0e0c;
-      --jon:#409cff;
-      --jon-soft:#0a2f52;
-      --jax:#bf5af2;
-      --jax-soft:#301a3d;
-      --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.6);
+      --bg:#0c0a22; --surface:#16133a; --surface-2:#201c4d; --ink:#f5f3ff; --muted:#a29dcf; --border:#2f2a63;
+      --accent:#8b6cff; --accent-ink:#ffffff; --accent-soft:#2a2266;
+      --good:#34e0a1; --good-soft:#0f3a30; --warn:#ffb454; --warn-soft:#45290f; --bad:#ff6b8b; --bad-soft:#4a1426;
+      --jon:#5f8cff; --jon-soft:#1a2c66; --jax:#ff5cad; --jax-soft:#4a1638;
+      --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -16px rgba(0,0,0,.75);
       color-scheme: dark;
     }
   }
   :root[data-theme="dark"]{
-    --bg:#000000;
-    --surface:#1c1c1e;
-    --surface-2:#2c2c2e;
-    --ink:#f5f5f7;
-    --muted:#98989d;
-    --border:#38383a;
-    --accent:#0a84ff;
-    --accent-ink:#ffffff;
-    --accent-soft:#0a2f52;
-    --good:#32d74b;
-    --good-soft:#0d3016;
-    --warn:#ff9f0a;
-    --warn-soft:#3a2705;
-    --bad:#ff453a;
-    --bad-soft:#3a0e0c;
-    --jon:#409cff;
-    --jon-soft:#0a2f52;
-    --jax:#bf5af2;
-    --jax-soft:#301a3d;
-    --shadow:0 1px 2px rgba(0,0,0,.4), 0 8px 24px -8px rgba(0,0,0,.6);
+    --bg:#0c0a22; --surface:#16133a; --surface-2:#201c4d; --ink:#f5f3ff; --muted:#a29dcf; --border:#2f2a63;
+    --accent:#8b6cff; --accent-ink:#ffffff; --accent-soft:#2a2266;
+    --good:#34e0a1; --good-soft:#0f3a30; --warn:#ffb454; --warn-soft:#45290f; --bad:#ff6b8b; --bad-soft:#4a1426;
+    --jon:#5f8cff; --jon-soft:#1a2c66; --jax:#ff5cad; --jax-soft:#4a1638;
+    --shadow:0 1px 2px rgba(0,0,0,.5), 0 16px 34px -16px rgba(0,0,0,.75);
     color-scheme: dark;
   }
   @media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .btn:hover{ filter:brightness(1.15); } }
@@ -412,9 +385,188 @@
     .table-wrap td .order-sub{ text-align:right; }
     .table-wrap td .row-actions{ justify-content:flex-end; }
   }
+
+  /* ================= Vibrant layer =================
+     Loaded after the base rules on purpose: same class names, louder treatment.
+     Each tab owns a colour (body[data-tab]) that drives its title bar, section
+     markers and nav chip; Jon and Jax keep fixed identity colours everywhere. */
+  :root{
+    --display:"Bricolage Grotesque",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+    --g-brand:linear-gradient(135deg,#6a45ff 0%,#b23cff 55%,#ff4fa3 100%);
+    --g-profit:linear-gradient(135deg,#00b37a 0%,#00c2d1 100%);
+    --g-pending:linear-gradient(135deg,#ff9a1f 0%,#ff5a3c 100%);
+    --g-jon:linear-gradient(135deg,#2563ff 0%,#22b8ff 100%);
+    --g-jax:linear-gradient(135deg,#e0208a 0%,#9b3dff 100%);
+    --tabc:#6a45ff; --tabg:linear-gradient(135deg,#6a45ff,#b23cff);
+  }
+  body[data-tab="overview"]{ --tabc:#6a45ff; --tabg:linear-gradient(135deg,#6a45ff,#b23cff); }
+  body[data-tab="inventory"]{ --tabc:#0fb5a5; --tabg:linear-gradient(135deg,#0fb5a5,#22b8ff); }
+  body[data-tab="preorders"]{ --tabc:#ff8a1f; --tabg:linear-gradient(135deg,#ffb020,#ff5a3c); }
+  body[data-tab="sales"]{ --tabc:#0aa877; --tabg:linear-gradient(135deg,#00b37a,#00c2d1); }
+  body[data-tab="settlements"]{ --tabc:#ee2f8a; --tabg:linear-gradient(135deg,#ff4fa3,#9b3dff); }
+
+  body{
+    background:
+      radial-gradient(900px 520px at 6% -10%, color-mix(in srgb,var(--tabc) 26%, transparent), transparent 62%),
+      radial-gradient(820px 480px at 104% 0%, rgba(255,79,163,.16), transparent 58%),
+      var(--bg);
+    background-attachment:fixed;
+    transition:background .4s;
+  }
+  h1,h2,h3{ font-family:var(--display); }
+
+  /* --- navigation --- */
+  .nav{ border-right:1px solid var(--border); background:color-mix(in srgb,var(--surface) 70%, transparent); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .brand{ font-family:var(--display); font-weight:800; font-size:20px; letter-spacing:-.02em; }
+  .brand .mark{ width:34px; height:34px; border-radius:11px; background:var(--g-brand); box-shadow:0 10px 22px -8px rgba(178,60,255,.75); }
+  .brand .mark svg{ width:19px; height:19px; }
+  .navbtn{ padding:7px 10px; border-radius:14px; font-weight:600; color:var(--muted); transition:background .15s, transform .15s; }
+  .navbtn[data-tab="overview"]{ --tabc:#6a45ff; } .navbtn[data-tab="inventory"]{ --tabc:#0fb5a5; }
+  .navbtn[data-tab="preorders"]{ --tabc:#ff8a1f; } .navbtn[data-tab="sales"]{ --tabc:#0aa877; }
+  .navbtn[data-tab="settlements"]{ --tabc:#ee2f8a; }
+  .navbtn .ic{ width:32px; height:32px; border-radius:10px; background:color-mix(in srgb,var(--tabc) 16%, transparent); color:var(--tabc); transition:all .15s; }
+  .navbtn .ic svg{ width:17px; height:17px; }
+  .navbtn:hover{ background:var(--surface); transform:translateX(2px); color:var(--ink); }
+  .navbtn.active{ background:var(--surface); color:var(--ink); box-shadow:var(--shadow); font-weight:700; }
+  .navbtn.active .ic{ background:var(--tabc); color:#fff; box-shadow:0 8px 18px -6px var(--tabc); }
+  .nav-foot{ font-size:12px; }
+
+  /* --- page header --- */
+  .main{ padding:28px 36px 70px; }
+  .topbar h1{ font-size:38px; font-weight:800; letter-spacing:-.035em; line-height:1.05; }
+  #pageTitle h1::after{ content:""; display:block; width:52px; height:6px; border-radius:9px; margin-top:10px; background:var(--tabg); }
+  .whoami select{ border-radius:99px; font-weight:700; padding:8px 32px 8px 14px; border:1px solid var(--border); box-shadow:var(--shadow); }
+
+  .section-head{ align-items:center; margin:34px 0 14px; }
+  .section-head h2{ font-size:23px; font-weight:800; letter-spacing:-.025em; display:flex; align-items:center; gap:11px; }
+  .section-head h2::before{ content:""; width:9px; height:24px; border-radius:6px; background:var(--tabg); }
+  .section-head .count{ background:var(--surface); border:1px solid var(--border); padding:3px 11px; border-radius:99px; font-weight:600; }
+
+  /* --- stat tiles --- */
+  .tiles{ grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:16px; margin-bottom:8px; }
+  .tile{
+    position:relative; overflow:hidden; border-radius:24px; padding:20px 22px 22px; color:#fff; border:0;
+    background:var(--g-brand); box-shadow:0 22px 38px -22px var(--glow,rgba(120,60,255,.8));
+    transition:transform .2s, box-shadow .2s;
+  }
+  .tile:hover{ transform:translateY(-3px); }
+  .tile::before{ content:""; position:absolute; right:-42px; top:-42px; width:150px; height:150px; border-radius:50%; background:rgba(255,255,255,.16); }
+  .tile::after{ content:""; position:absolute; right:26px; bottom:-56px; width:110px; height:110px; border-radius:50%; background:rgba(255,255,255,.10); }
+  .tile > *{ position:relative; z-index:1; }
+  .tile .eyebrow{ color:rgba(255,255,255,.88); text-transform:uppercase; letter-spacing:.09em; font-size:11px; font-weight:700; }
+  .tile .value{ font-family:var(--display); font-size:42px; font-weight:800; letter-spacing:-.035em; margin-top:6px; color:#fff; font-variant-numeric:tabular-nums; }
+  .tile .sub{ color:rgba(255,255,255,.9); font-size:13px; }
+  .tiles .tile:nth-child(2){ background:var(--g-jon); --glow:rgba(37,99,255,.7); }
+  .tiles .tile:nth-child(3){ background:var(--g-jax); --glow:rgba(224,32,138,.65); }
+  .tiles .tile:nth-child(4){ background:var(--g-pending); --glow:rgba(255,120,40,.65); }
+  .tiles .tile.t-profit, .tiles .tile.tone-owed{ background:var(--g-profit); --glow:rgba(0,179,122,.7); }
+  .tiles .tile.t-jon{ background:var(--g-jon); --glow:rgba(37,99,255,.7); }
+  .tiles .tile.t-jax{ background:var(--g-jax); --glow:rgba(224,32,138,.65); }
+  .tiles .tile.t-pending, .tiles .tile.tone-owe{ background:var(--g-pending); --glow:rgba(255,120,40,.65); }
+  .tiles .tile.t-brand{ background:var(--g-brand); --glow:rgba(120,60,255,.8); }
+  .tile.tone-owed .value, .tile.tone-owe .value{ color:#fff; }
+  .tiles.mini{ grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; }
+  .tiles.mini .tile{ border-radius:20px; padding:15px 17px 17px; }
+  .tiles.mini .tile .value{ font-size:29px; }
+
+  /* --- cards, tables, buttons --- */
+  .card{ border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+  .product-card{ border-radius:22px; }
+  .product-head{ padding:18px 20px; }
+  .product-title{ align-items:center; gap:13px; }
+  .product-title h3{ font-size:18px; font-weight:800; letter-spacing:-.02em; }
+  .cat{ background:color-mix(in srgb,var(--tabc) 15%, transparent); color:var(--tabc); font-weight:700; }
+  .stock-line b{ font-family:var(--display); font-size:15px; }
+  th{ background:var(--surface-2); color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-size:10.5px; font-weight:700; }
+  tbody tr{ transition:background .12s; }
+  tbody tr:hover{ background:color-mix(in srgb,var(--tabc) 6%, transparent); }
+  .btn{ border-radius:12px; font-weight:700; background:var(--surface-2); transition:transform .12s, box-shadow .12s, filter .12s; }
+  .btn:hover{ transform:translateY(-1px); }
+  .btn.primary{ background:var(--g-brand); color:#fff; box-shadow:0 12px 24px -12px rgba(150,60,255,.9); }
+  .btn.primary:hover{ filter:brightness(1.07); box-shadow:0 16px 28px -12px rgba(150,60,255,1); }
+  .btn.ghost{ background:transparent; box-shadow:none; }
+  .btn.ghost:hover{ background:var(--surface-2); transform:none; }
+
+  .badge{ font-weight:700; padding:4px 11px; letter-spacing:.005em; }
+  .badge.owner-Jon{ background:var(--g-jon); color:#fff; box-shadow:0 6px 14px -6px rgba(37,99,255,.8); }
+  .badge.owner-Jax{ background:var(--g-jax); color:#fff; box-shadow:0 6px 14px -6px rgba(224,32,138,.75); }
+  .badge.owner-none{ background:var(--warn-soft); color:var(--warn); border:1px dashed var(--warn); }
+  .badge.status-received, .badge.lifecycle-completed{ background:var(--good-soft); color:var(--good); }
+  .badge.status-preorder, .badge.lifecycle-pending, .badge.review{ background:var(--warn-soft); color:var(--warn); }
+  .badge.status-transit{ background:var(--accent-soft); color:var(--accent); }
+  .badge.label-note{ background:var(--surface-2); color:var(--muted); font-weight:600; }
+
+  .empty{ padding:52px 24px; }
+  .empty .ic{ width:64px; height:64px; margin:0 auto 14px; border-radius:20px; background:var(--tabg); color:#fff; box-shadow:0 14px 26px -12px var(--tabc); }
+  .empty .ic svg{ width:28px; height:28px; }
+
+  .banner{ border-radius:16px; }
+  .owner-queue{ border-radius:22px; padding:16px 18px; background:var(--warn-soft); border:1px solid color-mix(in srgb,var(--warn) 30%, transparent); }
+  .owner-queue-row{ border-radius:14px; box-shadow:var(--shadow); }
+  .owner-queue-row .amt{ font-family:var(--display); font-weight:800; font-size:20px; color:var(--good); }
+
+  /* --- product / sale visuals --- */
+  .chip{ width:46px; height:46px; border-radius:15px; display:inline-flex; align-items:center; justify-content:center; color:#fff;
+         font-family:var(--display); font-weight:800; font-size:16px; letter-spacing:-.02em; flex:0 0 auto; box-shadow:0 10px 20px -10px rgba(0,0,0,.45); }
+
+  .import-bar{ display:flex; align-items:center; gap:14px; padding:14px 18px; margin-bottom:6px; border-radius:20px; cursor:pointer; text-align:left;
+               border:2px solid transparent;
+               background:linear-gradient(var(--surface),var(--surface)) padding-box, var(--g-brand) border-box; }
+  .import-bar:hover, .import-bar.drag{ background:linear-gradient(var(--accent-soft),var(--accent-soft)) padding-box, var(--g-brand) border-box; }
+  .import-bar .ic{ width:42px; height:42px; border-radius:14px; background:var(--g-brand); color:#fff; flex:0 0 auto; display:flex; align-items:center; justify-content:center; margin:0; }
+  .import-bar .ic svg{ width:21px; height:21px; }
+  .import-bar .lead{ font-weight:800; font-size:15px; font-family:var(--display); }
+  .import-bar .hint{ margin:2px 0 0; }
+  .import-bar .go{ margin-left:auto; }
+
+  .sales-list{ display:flex; flex-direction:column; gap:10px; }
+  .sale-row{ display:flex; align-items:center; gap:14px; padding:14px 16px; background:var(--surface); border:1px solid var(--border);
+             border-radius:20px; box-shadow:var(--shadow); transition:transform .15s, border-color .15s; }
+  .sale-row:hover{ transform:translateY(-2px); border-color:color-mix(in srgb,var(--tabc) 45%, var(--border)); }
+  .sale-thumb{ flex:0 0 auto; width:52px; height:52px; }
+  .sale-thumb img{ width:52px; height:52px; border-radius:15px; object-fit:cover; background:var(--surface-2); }
+  .sale-thumb .chip{ width:52px; height:52px; }
+  .sale-main{ flex:1 1 auto; min-width:0; }
+  .sale-title{ font-weight:700; font-size:15px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .sale-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .sale-tags{ display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .sale-money{ flex:0 0 auto; text-align:right; min-width:92px; }
+  .sale-profit{ font-family:var(--display); font-weight:800; font-size:24px; letter-spacing:-.03em; color:var(--good); font-variant-numeric:tabular-nums; }
+  .sale-actions{ flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+
+  .modal{ border-radius:26px; box-shadow:0 30px 80px -20px rgba(40,10,120,.55); }
+  .modal-head h3{ font-size:19px; font-weight:800; }
+  .scan-overlay-ring{ border-color:var(--accent-soft); border-top-color:#b23cff; }
+  .scan-overlay-bar span{ background:var(--g-brand); }
+  .scan-overlay-card{ border-radius:28px; }
+  .dropzone{ border-radius:20px; }
+
+  .bottom-tabbar{ background:color-mix(in srgb,var(--surface) 88%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
+  @media (max-width:780px){
+    .main{ padding:20px 16px 96px; }
+    .topbar h1{ font-size:30px; }
+    .tile .value{ font-size:34px; }
+    .bottom-tabbar .navbtn{ transform:none; }
+    .bottom-tabbar .navbtn .ic{ width:34px; height:28px; border-radius:11px; }
+    .bottom-tabbar .navbtn.active{ background:transparent; box-shadow:none; }
+    .bottom-tabbar .navbtn.active .ic{ box-shadow:0 8px 16px -6px var(--tabc); }
+    .tiles.mini{ grid-template-columns:repeat(3,1fr); gap:8px; }
+    .tiles.mini .tile{ padding:12px 12px 14px; border-radius:18px; }
+    .tiles.mini .tile .eyebrow{ font-size:9.5px; letter-spacing:.06em; }
+    .tiles.mini .tile .value{ font-size:19px; }
+    .tiles.mini .tile .sub{ font-size:11px; }
+    .tiles.mini .tile::before, .tiles.mini .tile::after{ display:none; }
+    .sale-row{ flex-wrap:wrap; }
+    .sale-money{ text-align:left; min-width:0; }
+    .sale-actions{ flex-direction:row; flex-wrap:wrap; width:100%; justify-content:flex-start; }
+    .import-bar .hint{ display:none; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .tile, .tile:hover, .sale-row, .sale-row:hover, .btn, .btn:hover, .navbtn, .navbtn:hover{ transition:none; transform:none; }
+  }
 </style>
 </head>
-<body>
+<body data-tab="overview">
 
 <div class="shell">
   <nav class="nav">
@@ -423,7 +575,6 @@
       <button class="navbtn" data-tab="overview"><span class="ic" data-icon="overview"></span> Overview</button>
       <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span> Inventory</button>
       <button class="navbtn" data-tab="preorders"><span class="ic" data-icon="preorders"></span> Preorders</button>
-      <button class="navbtn" data-tab="orders"><span class="ic" data-icon="orders"></span> Orders</button>
       <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span> Sales</button>
       <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span> Settlements</button>
     </div>
@@ -433,7 +584,6 @@
     <button class="navbtn" data-tab="overview"><span class="ic" data-icon="overview"></span><span>Overview</span></button>
     <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span><span>Inventory</span></button>
     <button class="navbtn" data-tab="preorders"><span class="ic" data-icon="preorders"></span><span>Preorders</span></button>
-    <button class="navbtn" data-tab="orders"><span class="ic" data-icon="orders"></span><span>Orders</span></button>
     <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span><span>Sales</span></button>
     <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span><span>Settlements</span></button>
   </nav>
@@ -2328,8 +2478,10 @@
   function setTab(t){ tab = t; render(); }
 
   function render(){
+    if (tab==="orders") tab = "sales";
+    document.body.setAttribute("data-tab", tab);
     document.querySelectorAll(".navbtn").forEach(function(b){ b.classList.toggle("active", b.dataset.tab===tab); });
-    var titles = { overview:"Overview", inventory:"Inventory", preorders:"Preorders", orders:"Orders", sales:"Sales", settlements:"Settlements" };
+    var titles = { overview:"Overview", inventory:"Inventory", preorders:"Preorders", sales:"Sales", settlements:"Settlements" };
     $("#pageTitle").innerHTML = "<h1>"+titles[tab]+"</h1>";
     renderReviewBanner();
     renderOwnerBanner();
@@ -2337,7 +2489,6 @@
     if (tab==="overview") main.innerHTML = renderOverview();
     else if (tab==="inventory") main.innerHTML = renderInventory();
     else if (tab==="preorders") main.innerHTML = renderPreorders();
-    else if (tab==="orders") main.innerHTML = renderOrders();
     else if (tab==="sales") main.innerHTML = renderSales();
     else if (tab==="settlements") main.innerHTML = renderSettlements();
     paintIcons();
@@ -2433,9 +2584,9 @@
     var html = "";
     html += "<div class='tiles'>";
     var pending = pendingProfit();
-    html += "<div class='tile'><div class='eyebrow'>Total profit</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>";
-    html += "<div class='tile'><div class='eyebrow'>Your preorders</div><div class='value'>"+money(myTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
-    html += "<div class='tile'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
+    html += "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>";
+    html += "<div class='tile t-"+(whoAmI==="Jon"?"jon":"jax")+"'><div class='eyebrow'>Your preorders</div><div class='value'>"+money(myTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
+    html += "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
     html += "</div>";
 
     html += "<div class='section-head'><h2>Upcoming arrivals</h2><span class='count'>"+preorderBatches().length+" item(s) in the pipeline</span></div>";
@@ -2466,7 +2617,7 @@
     // always the real listing title, and later scans of the same listing keep matching cleanly.
     var html = "<div class='section-head'><h2>Products</h2></div>";
     if (!state.products.length){
-      html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — scan an order from the Orders tab and this fills in automatically.</div>";
+      html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — orders sync in from eBay on their own and this fills in automatically.</div>";
       return html;
     }
     state.products.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).forEach(function(p){
@@ -2474,7 +2625,7 @@
       var batches = state.batches.filter(function(b){ return b.productId===p.id; });
       html += "<div class='card product-card'>";
       html += "<div class='product-head'>";
-      html += "<div class='product-title'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span></div>";
+      html += "<div class='product-title'>"+productChip(p.name)+"<h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span></div>";
       html += "<div class='stock-line'><span>Received <b>"+stock.received+"</b></span><span>Sold <b>"+stock.sold+"</b></span><span>On hand <b>"+stock.remaining+"</b></span><span>Incoming <b>"+stock.pipeline+"</b></span></div>";
       html += "</div>";
       if (batches.length){
@@ -2531,82 +2682,70 @@
     return html;
   }
 
-  function renderSales(){
-    var rows = state.sales.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
-    var html = "<div class='section-head'><h2>Sales log</h2><button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></div>";
-    if (!rows.length){ html += "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales recorded yet.</div>"; return html; }
-    html += "<div class='card table-wrap'><table><thead><tr><th>Date</th><th>Item</th><th>Buyer</th><th>Qty</th><th>Net profit</th><th>Goes to</th><th>Status</th><th></th></tr></thead><tbody>";
-    rows.forEach(function(s){
-      var p = productById(s.productId);
-      var statusBadge = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
-      html += "<tr><td data-label='Date'>"+fmtDate(s.saleDate)+"</td><td data-label='Item'><div>"+esc(p?p.name:"—")+(s.orderNumber?"<div class='order-sub'>#"+esc(s.orderNumber)+"</div>":"")+"</div></td>"+
-        "<td data-label='Buyer'>"+esc(s.buyerName||"—")+"</td><td class='num-cell' data-label='Qty'>"+s.quantitySold+"</td><td class='num-cell' data-label='Net profit'>"+money(s.netProfit)+"</td>"+
-        "<td data-label='Goes to'>"+ownerBadge(s)+"</td><td data-label='Status'>"+statusBadge+"</td>"+
-        "<td data-label='Actions'><div class='row-actions'>"+
-          (s.screenshots&&s.screenshots.length ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
-          "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
-          "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
-        "</div></td></tr>";
-    });
-    html += "</tbody></table></div>";
-    return html;
+  function productChip(name){
+    name = String(name || "?");
+    var words = name.replace(/[^A-Za-z0-9 ]/g, " ").split(/\s+/).filter(Boolean);
+    var ini = ((words[0] || "?").charAt(0) + (words[1] || "").charAt(0)).toUpperCase();
+    var h = 0;
+    for (var i = 0; i < name.length; i++){ h = (h * 31 + name.charCodeAt(i)) % 360; }
+    return "<span class='chip' style='background:linear-gradient(135deg,hsl("+h+",82%,56%),hsl("+((h+48)%360)+",84%,46%))'>"+esc(ini)+"</span>";
   }
 
-  function renderOrders(){
-    var html = "";
-    var canUpload = !!assetsCap;
-    // scanState's own progress is shown by the full-screen scan overlay
-    // (see renderScanOverlay()) instead of an inline bar here now -- it
-    // needs to be visible no matter which tab is open, not just this one.
-    if (canUpload){
-      html += "<div class='dropzone' id='dropzone' data-action='open-file-picker'>"+
-        "<div class='ic' data-icon='camera'></div><div class='lead'>Drop a screenshot or eBay CSV here, or tap to choose one</div>"+
-        "<div class='hint'>An eBay Seller Hub order-details screenshot (read automatically via OCR — first scan loads a small engine, ~5–10s, then it's fast), or one of eBay's own exports for perfectly accurate bulk import: an <b>Orders Report</b> (Seller Hub → Orders → Download report) or a Payments <b>Transaction report</b> (Seller Hub → Payments → Reports) — upload both and they merge into the same orders by order number, no duplicates. Upload right when an item sells, then again once it ships and pays out — it updates the same entry.</div>"+
+  // One list for everything sold: what used to be split across "Orders" (screenshots, stock
+  // status, Mark received) and "Sales" (the table) is the same record, so it lives in one place.
+  function renderSales(){
+    var rows = state.sales.slice().sort(function(a,b){
+      var da = a.saleDate || "", db_ = b.saleDate || "";
+      return da < db_ ? 1 : da > db_ ? -1 : (b.createdAt||0)-(a.createdAt||0);
+    });
+    var total = totalNetProfit(), pending = pendingProfit();
+    var html = "<div class='tiles mini'>"+
+      "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
+      "<div class='tile t-pending'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending)+"</div><div class='sub'>waiting on eBay</div></div>"+
+      "<div class='tile t-brand'><div class='eyebrow'>Paid out</div><div class='value'>"+money(total-pending)+"</div><div class='sub'>ready to collect</div></div>"+
       "</div>";
+    if (assetsCap){
+      html += "<div class='section-head'><h2>Add an order</h2></div>"+
+        "<div class='import-bar' id='dropzone' data-action='open-file-picker'>"+
+          "<div class='ic' data-icon='camera'></div>"+
+          "<div><div class='lead'>Drop a screenshot or eBay CSV</div><div class='hint'>eBay orders sync in on their own every few minutes — this is only for anything the sync misses.</div></div>"+
+          "<span class='btn go'>Choose file</span></div>";
     } else {
-      html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Couldn't connect to screenshot storage — check your internet connection and reload the page, or use Record sale in the Sales tab to enter an order by hand in the meantime.</div>";
+      html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Couldn't connect to screenshot storage — check your connection and reload, or use Record sale to enter an order by hand.</div>";
     }
-
-    var withShots = state.sales.filter(function(s){ return s.screenshots && s.screenshots.length; })
-      .slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
-    html += "<div class='section-head'><h2>Recently scanned</h2><span class='count'>"+withShots.length+" order(s)</span></div>";
-    if (!withShots.length){
-      html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Nothing scanned yet.</div>";
-    } else {
-      html += "<div class='card'>";
-      withShots.forEach(function(s){
-        var p = productById(s.productId);
-        var shot = s.screenshots[s.screenshots.length-1];
-        var linkedBatches = batchesForSale(s.id);
-        var notYetReceived = linkedBatches.filter(function(b){ return b.status!=="received"; });
-        var stockBadge = "";
-        var receiveBtn = "";
-        if (notYetReceived.length){
-          stockBadge = "<span class='badge status-preorder'>Not received yet</span>";
-          receiveBtn = "<button class='btn small ghost' data-action='mark-sale-received' data-id='"+s.id+"'>Mark received</button>";
-        } else if (linkedBatches.length){
-          stockBadge = "<span class='badge status-received'>In hand</span>";
-        }
-        html += "<div class='order-row'>"+
-          "<div class='order-row-main'>"+
-            "<img class='order-thumb' src='"+esc(shot.id)+"' alt=''>"+
-            "<div class='order-main'>"+
-              "<div class='order-buyer'>"+esc(s.buyerName||"Unknown buyer")+"</div>"+
-              "<div class='order-sub'>"+esc(p?p.name:"—")+(s.orderNumber?" · #"+esc(s.orderNumber):"")+" · "+money(s.netProfit)+" → "+ownerBadge(s)+"</div>"+
-            "</div>"+
-          "</div>"+
-          "<div class='order-row-meta'>"+
-            "<div class='row-actions'>"+
-              (s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "")+
-              stockBadge+
-            "</div>"+
-            "<div class='row-actions'>"+receiveBtn+"<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button></div>"+
-          "</div>"+
-        "</div>";
-      });
-      html += "</div>";
-    }
-    return html;
+    html += "<div class='section-head'><h2>Sales</h2><button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></div>";
+    if (!rows.length){ return html + "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>"; }
+    html += "<div class='sales-list'>";
+    rows.forEach(function(s){
+      var p = productById(s.productId);
+      var name = p ? p.name : "Unknown item";
+      var shot = s.screenshots && s.screenshots.length ? s.screenshots[s.screenshots.length-1] : null;
+      var linked = batchesForSale(s.id);
+      var notRecv = linked.filter(function(b){ return b.status!=="received"; });
+      var stockTag = "", recvBtn = "";
+      if (notRecv.length){
+        stockTag = "<span class='badge status-preorder'>Not received yet</span>";
+        recvBtn = "<button class='btn small ghost' data-action='mark-sale-received' data-id='"+s.id+"'>Mark received</button>";
+      } else if (linked.length){
+        stockTag = "<span class='badge status-received'>In hand</span>";
+      }
+      var payTag = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
+      var labelTag = (s.profitSource==="ebay-provisional" && s.ebayShipped) ? "<span class='badge label-note' title='eBay hasn&#39;t reported the shipping label cost yet, so this is before it'>Before label cost</span>" : "";
+      html += "<div class='sale-row'>"+
+        "<div class='sale-thumb'>"+(shot ? "<img src='"+esc(shot.id)+"' alt=''>" : productChip(name))+"</div>"+
+        "<div class='sale-main'>"+
+          "<div class='sale-title'>"+esc(name)+"</div>"+
+          "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
+          "<div class='sale-tags'>"+ownerBadge(s)+stockTag+payTag+labelTag+"</div>"+
+        "</div>"+
+        "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>net profit</div></div>"+
+        "<div class='sale-actions'>"+recvBtn+
+          (shot ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
+          "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
+          "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
+        "</div></div>";
+    });
+    return html + "</div>";
   }
 
   function renderSettlements(){
@@ -2636,7 +2775,7 @@
     var mineSub = mine.pendingCount
       ? money(mine.available)+" available · "+money(mine.pending)+" pending across "+mine.pendingCount+" sale"+(mine.pendingCount===1?"":"s")
       : money(mine.available)+" available · nothing pending right now";
-    var html = "<div class='tiles'><div class='tile'><div class='eyebrow'>Your net profit</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div></div>";
+    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your net profit</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div></div>";
 
     html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
     html += "<div class='tiles'>"+
