@@ -752,6 +752,52 @@
   .wk-labels{ display:flex; gap:8px; padding:7px 2px 0; }
   .wk-labels span{ flex:1 1 0; min-width:0; text-align:center; font-size:10.5px; color:var(--muted); font-weight:600; white-space:nowrap; }
   @media (prefers-reduced-motion: reduce){ .sk{ animation:none; } }
+
+  /* confirm rows with a second line, owner confirm hero */
+  .confirm-row span small, .confirm-row b small{ display:block; font-size:11.5px; font-weight:500; color:var(--muted); }
+  .confirm-row b{ font-variant-numeric:tabular-nums; text-align:right; }
+  .oc-hero{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; font-size:15px; font-weight:600; }
+  .oc-hero .badge{ font-size:15px; padding:7px 16px; }
+  .check{ display:flex; gap:10px; align-items:flex-start; margin:4px 0 14px; font-size:13.5px; line-height:1.4; cursor:pointer; }
+  .check input{ margin-top:3px; width:18px; height:18px; flex:0 0 auto; }
+  /* store trip */
+  .seg-choice{ display:flex; flex-direction:column; gap:8px; }
+  .field .seg-choice label{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; font-size:14px; font-weight:500; color:var(--ink); margin:0; }
+  .seg-choice input[type=radio]{ width:20px; height:20px; flex:0 0 auto; margin:0; }
+  .seg-choice small{ display:inline; }
+  .seg-choice small{ color:var(--muted); }
+  .trip-list{ display:flex; flex-direction:column; gap:8px; max-height:38vh; overflow-y:auto; margin:6px 0 12px; padding-right:2px; }
+  .trip-row{ background:var(--surface-2); border-radius:16px; padding:10px 12px; display:flex; flex-direction:column; gap:8px; }
+  .trip-pick{ display:flex; align-items:center; gap:10px; cursor:pointer; margin:0; min-width:0; }
+  .trip-pick input{ width:20px; height:20px; flex:0 0 auto; }
+  .trip-name{ font-size:13.5px; font-weight:600; color:var(--ink); line-height:1.3; min-width:0; }
+  .trip-nums{ display:grid; grid-template-columns:90px 1fr; gap:10px; }
+  .trip-nums label{ font-size:11.5px; font-weight:600; color:var(--muted); margin:0; }
+  .trip-nums input{ width:100%; box-sizing:border-box; margin-top:4px; padding:9px 10px; border-radius:12px; border:1px solid var(--border); background:var(--surface); color:var(--ink); font:inherit; font-size:16px; }
+  .trip-summary{ background:var(--accent-soft); color:var(--ink); border-radius:14px; padding:12px 14px; font-size:13.5px; font-variant-numeric:tabular-nums; }
+  .trip-summary .muted{ color:var(--muted); }
+  .trip-out b{ font-size:16px; }
+  /* dashboard cards */
+  .dash-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(300px,1fr)); gap:14px; margin-bottom:28px; }
+  .dash-card{ padding:16px; display:flex; flex-direction:column; gap:12px; }
+  .dash-head{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  .dash-head h3{ margin:0; font-size:16px; }
+  .k-hand{ background:var(--accent); } .k-in{ background:var(--warn); } .k-sold{ background:var(--good); }
+  .k-jon{ background:var(--jon); } .k-jax{ background:var(--jax); } .k-none{ background:var(--border); }
+  .stk-legend{ display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--muted); font-weight:600; }
+  .stk-legend i, .split-rows i{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
+  .stk-legend b{ color:var(--ink); font-variant-numeric:tabular-nums; margin-right:4px; }
+  .stk-row{ display:flex; flex-direction:column; gap:5px; }
+  .stk-name{ font-size:13px; font-weight:600; color:var(--ink); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .stk-bar{ display:flex; gap:2px; height:12px; }
+  .stk-bar .seg, .split-bar .seg{ min-width:6px; border-radius:6px; }
+  .stk-nums{ font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+  .split-bar{ display:flex; gap:3px; height:20px; }
+  .split-rows{ display:flex; flex-direction:column; gap:10px; }
+  .split-rows div{ display:flex; align-items:center; font-size:14px; font-weight:600; }
+  .split-rows span{ flex:1 1 auto; color:var(--ink); }
+  .split-rows b{ font-variant-numeric:tabular-nums; margin-right:12px; }
+  .split-rows em{ font-style:normal; color:var(--muted); font-size:12.5px; width:38px; text-align:right; font-variant-numeric:tabular-nums; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2115,6 +2161,7 @@
     sales: '<path d="M20 12.5l-7.5 7.5-9-9V4h9z"/><circle cx="7.2" cy="7.2" r="1" fill="currentColor" stroke="none"/>',
     settlements: '<path d="M7 8h11l-3-3M17 16H6l3 3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
+    receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     warning: '<path d="M12 3.5l9.5 16.5H2.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17" r=".55" fill="currentColor" stroke="none"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="8" r=".55" fill="currentColor" stroke="none"/>',
@@ -2814,7 +2861,7 @@
   // each, including units not sold yet). The split rule below mirrors ebay_sync.py: highest
   // profit per unit goes to Jon until his units are covered, the rest to Jax; sales still in
   // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
-  var lastPurchaseUndo = null, pendingBought = null;
+  var lastPurchaseUndo = null, pendingBought = null, pendingTrip = null, lastTripUndo = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
   function nameKey(name){ return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
   function groupKeyForSale(s){
@@ -3015,7 +3062,7 @@
     paintIcons();
   }
 
-  function assignOwner(saleId, who){
+  function assignOwner(saleId, who, undo){
     var s = state.sales.find(function(x){ return x.id===saleId; });
     if (!s) return Promise.resolve();
     return Promise.resolve(updateSale(saleId, { attributedTo: who, needsOwner: false, ownerSource: "manual" })).then(function(){
@@ -3023,21 +3070,103 @@
       // owner, so it's created here (same syncStockForSale every other sale uses), and a sale eBay
       // already shows as shipped flips its stock to received the same way "Completed" does.
       return syncStockForSale(s.productId, s.quantitySold, who, s.saleDate, saleId, saleId);
+    }).then(function(ref){
+      if (undo && ref) undo.created.push(ref && ref.id ? ref.id : ref);
     }).then(function(){ if (s.ebayShipped) return markSaleReceived(saleId); });
   }
+  var lastOwnerUndo = null;
+  function ownerConfirmRows(ids){
+    return ids.map(function(id){
+      var sa = state.sales.find(function(x){ return x.id===id; }); if (!sa) return "";
+      var p = productById(sa.productId);
+      return "<div class='confirm-row'><span>"+money(sa.netProfit)+" · "+esc(p?p.name:"Item")+"<small>"+esc(sa.buyerName||"")+(sa.saleDate?" · "+fmtDate(sa.saleDate):"")+"</small></span>"+
+        (sa.attributedTo ? ownerPill(sa.attributedTo) : "<span class='badge owner-none'>Unassigned</span>")+"</div>";
+    }).join("");
+  }
+  // Every "pick a person" tap lands here first: nothing is written until Confirm.
+  function openOwnerConfirm(ids, who, flip){
+    ids = ids.filter(function(id){ return state.sales.some(function(x){ return x.id===id; }); });
+    if (!ids.length){ toast("Nothing to assign"); return; }
+    var n = ids.length;
+    openModal((flip ? "Switch to " : "Assign to ")+who+"?",
+      "<div class='oc-hero'><span class='oc-arrow'>"+(n>1 ? n+" sales" : "This sale")+" →</span> "+ownerPill(who)+"</div>"+
+      "<div class='confirm-list'>"+ownerConfirmRows(ids)+"</div>"+
+      "<div class='hint'>Totals, stock and the Jon / Jax balance update straight away. You can undo right after, or change it later.</div>",
+      "<button class='btn' data-action='close-modal'>Cancel</button>"+
+      "<button class='btn primary' data-action='confirm-owner' data-who='"+who+"' data-flip='"+(flip?1:0)+"' data-ids='"+ids.map(esc).join(",")+"'>"+(flip?"Switch":"Assign")+" "+(n>1?n+" sales":"")+" to "+who+"</button>");
+  }
+  function applyOwner(ids, who, flip){
+    var undo = { sales:[], created:[], batches:[] };
+    ids.forEach(function(id){
+      var sa = state.sales.find(function(x){ return x.id===id; }); if (!sa) return;
+      undo.sales.push({ id:id, attributedTo:sa.attributedTo||null, needsOwner:!!sa.needsOwner, ownerSource:sa.ownerSource||null });
+      if (flip){
+        batchesForSale(id).forEach(function(b){ undo.batches.push({ id:b.id, owner:b.owner }); updateBatch(b.id, { owner: who }); });
+        updateSale(id, { attributedTo: who, ownerSource: "manual" });
+      } else {
+        assignOwner(id, who, undo);
+      }
+    });
+    lastOwnerUndo = undo;
+    toastAction(ids.length>1 ? ids.length+" sales now go to "+who+"." : "Now goes to "+who+".", "Undo", "undo-owner");
+  }
+  function undoOwner(){
+    var u = lastOwnerUndo;
+    if (!u){ toast("Nothing to undo"); return; }
+    lastOwnerUndo = null;
+    u.created.forEach(function(id){ if (id) deleteBatch(id); });
+    u.batches.forEach(function(b){ updateBatch(b.id, { owner: b.owner }); });
+    u.sales.forEach(function(x){ updateSale(x.id, { attributedTo:x.attributedTo, needsOwner:x.needsOwner, ownerSource:x.ownerSource }); });
+    toast("Undone — back to how it was");
+  }
   function flipOwner(saleId){
-    var s = state.sales.find(function(x){ return x.id===saleId; });
-    if (!s || !s.attributedTo) return;
-    var who = s.attributedTo==="Jon" ? "Jax" : "Jon";
-    updateSale(saleId, { attributedTo: who, ownerSource: "manual" });
-    batchesForSale(saleId).forEach(function(b){ updateBatch(b.id, { owner: who }); });
-    toast("Now goes to "+who+" — tap again to switch back");
+    var sa = state.sales.find(function(x){ return x.id===saleId; });
+    if (!sa || !sa.attributedTo) return;
+    openOwnerConfirm([saleId], sa.attributedTo==="Jon" ? "Jax" : "Jon", true);
   }
   function ownerBadge(s){
     if (!s.attributedTo) return "<span class='badge owner-none'>Unassigned</span>";
     return "<button type='button' class='badge owner-"+s.attributedTo+"' data-action='flip-owner' data-id='"+s.id+"' title='Tap to give this sale to "+(s.attributedTo==="Jon"?"Jax":"Jon")+"'>"+s.attributedTo+"</button>";
   }
 
+  function dashCardsHtml(){
+    if (!state.products.length && !state.sales.length) return "";
+    var groups = productGroupList().map(function(g){
+      var st = groupStock(g.pids), onHand = Math.max(0, st.remaining);
+      return { g:g, sold:st.sold, onHand:onHand, incoming:st.pipeline, total: st.sold + onHand + st.pipeline };
+    }).filter(function(x){ return x.total > 0; }).sort(function(a,b){ return b.total - a.total; });
+    var tot = { sold:0, onHand:0, incoming:0 };
+    groups.forEach(function(x){ tot.sold += x.sold; tot.onHand += x.onHand; tot.incoming += x.incoming; });
+    var max = groups.length ? groups[0].total : 1;
+    var html = "<div class='dash-grid'>";
+    // --- stock at a glance
+    html += "<div class='card dash-card'><div class='dash-head'><h3>Stock at a glance</h3><button class='btn small ghost' data-action='goto-inventory'>Inventory</button></div>"+
+      "<div class='stk-legend'>"+
+        "<span><i class='k-hand'></i><b>"+tot.onHand+"</b> on hand</span><span><i class='k-in'></i><b>"+tot.incoming+"</b> incoming</span><span><i class='k-sold'></i><b>"+tot.sold+"</b> sold</span></div>";
+    if (!groups.length) html += "<div class='sale-sub'>Nothing in stock yet.</div>";
+    groups.slice(0, 6).forEach(function(x){
+      var seg = function(n, cls){ return n>0 ? "<span class='seg "+cls+"' style='flex:"+n+"'></span>" : ""; };
+      html += "<div class='stk-row' title='"+esc(x.g.p.name)+"'><div class='stk-name'>"+esc(x.g.p.name)+"</div>"+
+        "<div class='stk-bar' style='width:"+Math.max(14, Math.round(x.total/max*100))+"%'>"+seg(x.onHand,"k-hand")+seg(x.incoming,"k-in")+seg(x.sold,"k-sold")+"</div>"+
+        "<div class='stk-nums'>"+[x.onHand?x.onHand+" on hand":"", x.incoming?x.incoming+" incoming":"", x.sold?x.sold+" sold":""].filter(Boolean).join(" · ")+"</div></div>";
+    });
+    if (groups.length > 6) html += "<div class='sale-sub' style='margin-top:6px'>+ "+(groups.length-6)+" more in Inventory</div>";
+    html += "</div>";
+    // --- who earns what
+    var by = { Jon:0, Jax:0, none:0 };
+    state.sales.forEach(function(sa){ by[sa.attributedTo==="Jon" ? "Jon" : sa.attributedTo==="Jax" ? "Jax" : "none"] += Number(sa.netProfit||0); });
+    var all = by.Jon + by.Jax + by.none;
+    var pct = function(v){ return all>0 ? Math.round(v/all*100) : 0; };
+    html += "<div class='card dash-card'><div class='dash-head'><h3>Payout by person</h3><span class='count'>"+money(all)+"</span></div>"+
+      "<div class='split-bar' role='img' aria-label='Payout split between Jon, Jax and unassigned'>"+
+        (by.Jon>0?"<span class='seg k-jon' style='flex:"+by.Jon+"'></span>":"")+(by.Jax>0?"<span class='seg k-jax' style='flex:"+by.Jax+"'></span>":"")+(by.none>0?"<span class='seg k-none' style='flex:"+by.none+"'></span>":"")+"</div>"+
+      "<div class='split-rows'>"+
+        "<div><i class='k-jon'></i><span>Jon</span><b>"+money(by.Jon)+"</b><em>"+pct(by.Jon)+"%</em></div>"+
+        "<div><i class='k-jax'></i><span>Jax</span><b>"+money(by.Jax)+"</b><em>"+pct(by.Jax)+"%</em></div>"+
+        (by.none>0 ? "<div><i class='k-none'></i><span>Unassigned</span><b>"+money(by.none)+"</b><em>"+pct(by.none)+"%</em></div>" : "")+
+      "</div></div>";
+    return html + "</div>";
+  }
   function payoutChartHtml(){
     var now = new Date(), day0 = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     var monday = new Date(day0); monday.setDate(day0.getDate() - ((day0.getDay()+6)%7));
@@ -3076,7 +3205,7 @@
       "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
       "</div>";
 
-    html += payoutChartHtml();
+    html += payoutChartHtml() + dashCardsHtml();
     var latest = state.sales.slice().sort(bySaleNewest).slice(0,4);
     html += "<div class='section-head'><h2>Latest sales</h2><button class='btn ghost' data-action='goto-sales'>See all</button></div>";
     html += latest.length
@@ -3122,6 +3251,126 @@
       "</div></div>";
   }
 
+  function productGroupList(){
+    var pg = {};
+    state.products.forEach(function(p){ var k = nameKey(p.name); (pg[k] = pg[k] || []).push(p); });
+    return Object.keys(pg).map(function(k){
+      var ps = pg[k].slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+      var img = ps.filter(function(x){ return x.imageUrl; })[0];
+      return { key:k, ps:ps, p: Object.assign({}, ps[0], { imageUrl: img ? img.imageUrl : ps[0].imageUrl }), pids: ps.map(function(x){ return x.id; }) };
+    }).sort(function(a,b){ return (b.ps[0].createdAt||0)-(a.ps[0].createdAt||0); });
+  }
+  function groupStock(pids){
+    var st = { received:0, pipeline:0, sold:0, remaining:0 };
+    pids.forEach(function(id){ var x = stockFor(id); st.received += x.received; st.pipeline += x.pipeline; st.sold += x.sold; st.remaining += x.remaining; });
+    return st;
+  }
+  function round2(v){ return Math.round(v*100)/100; }
+
+  function readTrip(){
+    var t = { who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", mode: "prop", items:{} };
+    var m = document.querySelector("input[name='t_mode']:checked"); if (m) t.mode = m.value;
+    document.querySelectorAll(".trip-row").forEach(function(row){
+      var key = row.dataset.key;
+      t.items[key] = { checked: row.querySelector(".trip-chk").checked, qty: row.querySelector(".trip-qty").value, price: row.querySelector(".trip-price").value };
+    });
+    return t;
+  }
+  function tripCalc(t){
+    var sel = [];
+    productGroupList().forEach(function(g){
+      var it = t.items[g.key]; if (!it || !it.checked) return;
+      sel.push({ g:g, qty: Math.max(1, Math.floor(Number(it.qty)||1)), price: Number(it.price)||0 });
+    });
+    var subtotal = 0, units = 0;
+    sel.forEach(function(r){ subtotal += r.qty*r.price; units += r.qty; });
+    subtotal = round2(subtotal);
+    var total = Number(t.total)||0, extras = round2(total - subtotal);
+    sel.forEach(function(r){
+      var each = t.mode==="even" ? (units ? extras/units : 0) : (subtotal>0 ? r.price*(extras/subtotal) : 0);
+      r.extraEach = each; r.final = round2(r.price + each);
+    });
+    var problem = "";
+    if (!sel.length) problem = "Tick the items you bought on this trip.";
+    else if (sel.some(function(r){ return !(r.price>0); })) problem = "Enter the price for each ticked item (before tax).";
+    else if (!(total>0)) problem = "Enter the total you paid at checkout.";
+    return { rows:sel, subtotal:subtotal, units:units, total:total, extras:extras, rate: subtotal>0 ? extras/subtotal : 0, problem:problem };
+  }
+  function updateTripSummary(){
+    var box = $("#tripSummary"); if (!box) return;
+    var c = tripCalc(readTrip());
+    if (c.problem){ box.innerHTML = "<span class='muted'>"+esc(c.problem)+"</span>"; return; }
+    box.innerHTML = "Items "+money(c.subtotal)+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
+  }
+  function openTripModal(){
+    var t = pendingTrip || { who:whoAmI, total:"", mode:"prop", items:{} };
+    var rows = productGroupList().map(function(g){
+      var it = t.items[g.key] || {};
+      var ownerQty = 0;
+      state.batches.forEach(function(b){ if (g.pids.indexOf(b.productId)!==-1 && b.owner===t.who) ownerQty += Number(b.quantity||0); });
+      var qty = it.qty!=null && it.qty!=="" ? it.qty : (ownerQty || groupStock(g.pids).sold || 1);
+      return "<div class='trip-row' data-key='"+esc(g.key)+"'>"+
+        "<label class='trip-pick'><input type='checkbox' class='trip-chk'"+(it.checked?" checked":"")+"> "+prodThumb(g.p, g.p.name)+"<span class='trip-name'>"+esc(g.p.name)+"</span></label>"+
+        "<div class='trip-nums'><label>Qty<input type='number' class='trip-qty' min='1' step='1' value='"+esc(qty)+"'></label>"+
+        "<label>Price each<input type='number' class='trip-price' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(it.price!=null?it.price:"")+"'></label></div></div>";
+    }).join("");
+    openModal("Log a store trip",
+      "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost.</div>"+
+      "<div class='row2'><div class='field'><label>Who paid</label><select id='t_who'>"+ownerOptions(t.who)+"</select></div>"+
+      "<div class='field'><label>Total paid at checkout ($)</label><input id='t_total' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.total)+"'></div></div>"+
+      "<div class='field'><label>Spread tax &amp; fees</label><div class='seg-choice'>"+
+        "<label><input type='radio' name='t_mode' value='prop'"+(t.mode!=="even"?" checked":"")+"> In proportion to price <small>(how sales tax works)</small></label>"+
+        "<label><input type='radio' name='t_mode' value='even'"+(t.mode==="even"?" checked":"")+"> Evenly per unit</label></div></div>"+
+      "<div class='trip-list'>"+rows+"</div>"+
+      "<div class='trip-summary' id='tripSummary'></div>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='trip-review'>Review</button>", { wide:true });
+    updateTripSummary();
+  }
+  function openTripConfirm(){
+    var t = readTrip(); pendingTrip = t;
+    var c = tripCalc(t);
+    if (c.problem){ toast(c.problem); return; }
+    var paidSum = round2(c.rows.reduce(function(a,r){ return a + r.final*r.qty; }, 0));
+    var rows = c.rows.map(function(r){
+      return "<div class='confirm-row trip-out'><span>"+esc(r.g.p.name)+"<small>"+r.qty+" × "+money(r.price)+" + "+money(r.extraEach)+" tax &amp; fees</small></span><b>"+money(r.final)+"<small>each</small></b></div>";
+    }).join("");
+    openModal("Confirm unit costs",
+      "<div class='sale-sub'>"+ownerPill(t.who)+" paid "+money(c.total)+" · "+c.units+" unit"+(c.units===1?"":"s")+"</div>"+
+      "<div class='confirm-list' style='margin-top:10px'>"+rows+"</div>"+
+      "<div class='hint'>These become the unit cost on "+esc(t.who)+"'s batches of each item"+(Math.abs(paidSum-c.total)>=0.01 ? " (rounded to the cent, "+money(paidSum)+" in total)" : "")+
+      ". An item with no batch for "+esc(t.who)+" gets one created. You can undo right after.</div>",
+      "<button class='btn' data-action='trip-back'>Back</button><button class='btn primary' data-action='trip-apply'>Apply costs</button>");
+  }
+  function applyTrip(){
+    var t = pendingTrip; if (!t) return;
+    var c = tripCalc(t); if (c.problem) return;
+    var undo = { changed:[], created:[] }, today = todayISO();
+    c.rows.forEach(function(r){
+      var mine = state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who; });
+      if (mine.length){
+        mine.forEach(function(b){
+          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, note:b.note||"", needsReview:!!b.needsReview });
+          updateBatch(b.id, { unitCost:r.final, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+        });
+      } else {
+        var shipped = state.sales.some(function(x){ return r.g.pids.indexOf(x.productId)!==-1 && x.ebayShipped; });
+        Promise.resolve(addBatch({ productId:r.g.ps[0].id, owner:t.who, quantity:r.qty, unitCost:r.final, status: shipped?"received":"preorder",
+          receivedDate: shipped?today:null, expectedArrival:null, needsReview:false, note:"Store trip "+fmtDate(today) }))
+          .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
+      }
+    });
+    lastTripUndo = undo; pendingTrip = null;
+    toastAction("Unit costs applied to "+c.rows.length+" item"+(c.rows.length===1?"":"s")+".", "Undo", "undo-trip");
+  }
+  function undoTrip(){
+    var u = lastTripUndo;
+    if (!u){ toast("Nothing to undo"); return; }
+    lastTripUndo = null;
+    u.created.forEach(function(id){ if (id) deleteBatch(id); });
+    u.changed.forEach(function(x){ updateBatch(x.id, { unitCost:x.unitCost, note:x.note, needsReview:x.needsReview }); });
+    toast("Undone — costs restored");
+  }
+
   function renderInventory(){
     // No manual "Add item" here on purpose: a hand-typed product name almost never matches the
     // real, SEO-stuffed eBay listing title closely enough to link to it, which used to silently
@@ -3129,16 +3378,11 @@
     // listing title and later orders for the same listing keep matching cleanly.
     // Separate eBay listings of the same product are shown as one card (stock and batches
     // combined, split per person); the data underneath is untouched.
-    var pgroups = {};
-    state.products.forEach(function(p){ var k = nameKey(p.name); (pgroups[k] = pgroups[k] || []).push(p); });
-    var plist = Object.keys(pgroups).map(function(k){
-      var ps = pgroups[k].slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
-      var img = ps.filter(function(x){ return x.imageUrl; })[0];
-      return { key:k, ps:ps, p: Object.assign({}, ps[0], { imageUrl: img ? img.imageUrl : ps[0].imageUrl }), pids: ps.map(function(x){ return x.id; }) };
-    }).sort(function(a,b){ return (b.ps[0].createdAt||0)-(a.ps[0].createdAt||0); });
+    var plist = productGroupList();
     var totalItems = plist.length;
     if (invQ.trim()) plist = plist.filter(function(g){ return matchesQuery(g.p.name, invQ); });
-    var html = "<div class='section-head'><h2>Products</h2><span class='count'>"+(invQ.trim() ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
+    var html = "<div class='section-head'><h2>Products</h2>"+(totalItems ? "<button class='btn' data-action='open-trip'><span class='ic' data-icon='receipt'></span> Log a store trip</button>" : "")+
+      "<span class='count'>"+(invQ.trim() ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
     if (totalItems > 3){
       html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
         "<input id='invSearch' type='search' placeholder='Search products' value='"+esc(invQ)+"' aria-label='Search products' autocomplete='off'></div></div>";
@@ -3430,16 +3674,28 @@
     );
   }
 
+  // other batches of the same product (any listing) owned by the same person
+  function siblingBatches(b){
+    var pr = productById(b.productId);
+    var pids = pr ? pidsForKey(nameKey(pr.name)) : [b.productId];
+    return state.batches.filter(function(x){ return x.id!==b.id && x.owner===b.owner && pids.indexOf(x.productId)!==-1; });
+  }
   function openEditBatchModal(id){
     var b = state.batches.find(function(x){ return x.id===id; });
     if(!b) return;
     var p = productById(b.productId);
+    var sibs = siblingBatches(b);
+    var allUnknown = sibs.length && sibs.every(function(x){ return !Number(x.unitCost); });
+    var applyAll = sibs.length
+      ? "<label class='check'><input type='checkbox' id='f_applyall'"+(allUnknown?" checked":"")+"> <span>Use this unit cost for the other "+sibs.length+" "+esc(b.owner)+" batch"+(sibs.length>1?"es":"")+" of this item too</span></label>"
+      : "";
     openModal("Edit batch — "+(p?p.name:""),
       "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(b.owner)+"</select></div>"+
       "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='"+b.quantity+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' value='"+b.unitCost+"'></div>"+
       "<div class='field'><label>Status</label><select id='f_status'>"+statusOptions(b.status)+"</select></div></div>"+
       "<div class='field'><label>Expected arrival</label><input id='f_arrival' type='date' value='"+(b.expectedArrival||"")+"'></div>"+
+      applyAll+
       "<div class='field'><label>Note</label><textarea id='f_note'>"+esc(b.note||"")+"</textarea></div>"+
       "<input type='hidden' id='f_id' value='"+id+"'>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-edit-batch'>Save</button>"
@@ -4059,8 +4315,15 @@
     if (action==="sales-more"){ salesShown += 30; render(); return; }
     if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }); pendingBought = null; closeModal(); return; }
     if (action==="undo-purchase"){ undoPurchase(); var tt = t.closest(".toast"); if (tt) tt.remove(); return; }
-    if (action==="assign-owner"){ assignOwner(t.dataset.id, t.dataset.who); return; }
-    if (action==="assign-all-owner"){ needsOwnerSales().forEach(function(s){ assignOwner(s.id, t.dataset.who); }); toast("All assigned to "+t.dataset.who); return; }
+    if (action==="assign-owner"){ openOwnerConfirm([t.dataset.id], t.dataset.who, false); return; }
+    if (action==="assign-all-owner"){ openOwnerConfirm(needsOwnerSales().map(function(x){ return x.id; }), t.dataset.who, false); return; }
+    if (action==="open-trip"){ pendingTrip = null; openTripModal(); return; }
+    if (action==="trip-review"){ openTripConfirm(); return; }
+    if (action==="trip-back"){ openTripModal(); return; }
+    if (action==="trip-apply"){ applyTrip(); closeModal(); return; }
+    if (action==="undo-trip"){ undoTrip(); var tz = t.closest(".toast"); if (tz) tz.remove(); return; }
+    if (action==="confirm-owner"){ applyOwner(t.dataset.ids.split(","), t.dataset.who, t.dataset.flip==="1"); closeModal(); return; }
+    if (action==="undo-owner"){ undoOwner(); var tq = t.closest(".toast"); if (tq) tq.remove(); return; }
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
@@ -4121,15 +4384,24 @@
       // note field still holds the exact auto-fill placeholder text untouched, clear it instead
       // of leaving it to sit there forever next to a now-real cost the user just entered.
       var editedNote = $("#f_note").value.trim();
-      if (editedNote === AUTO_BATCH_NOTE) editedNote = "";
+      if (editedNote === AUTO_BATCH_NOTE || editedNote === PURCHASE_NOTE) editedNote = "";
+      var oldB = state.batches.find(function(x){ return x.id===id; });
+      var newCost = Number($("#f_cost").value)||0, newStatus = $("#f_status").value;
       updateBatch(id, {
         owner: $("#f_owner").value, quantity: Number($("#f_qty").value)||1,
-        unitCost: Number($("#f_cost").value)||0, status: $("#f_status").value,
+        unitCost: newCost, status: newStatus,
         expectedArrival: $("#f_arrival").value || null,
-        receivedDate: $("#f_status").value==="received" ? (todayISO()) : null,
+        receivedDate: newStatus==="received" ? ((oldB && oldB.status==="received" && oldB.receivedDate) || todayISO()) : null,
         note: editedNote, needsReview:false
       });
-      toast("Batch updated");
+      var applyBox = $("#f_applyall"), nApplied = 0;
+      if (applyBox && applyBox.checked && newCost > 0 && oldB){
+        siblingBatches(oldB).forEach(function(x){
+          nApplied++;
+          updateBatch(x.id, { unitCost:newCost, needsReview:false, note:(x.note===AUTO_BATCH_NOTE || x.note===PURCHASE_NOTE) ? "" : (x.note||"") });
+        });
+      }
+      toast(nApplied ? "Cost applied to this batch and "+nApplied+" more" : "Batch updated");
       closeModal();
       return;
     }
@@ -4348,9 +4620,13 @@
       else if (!e.shiftKey && document.activeElement === last){ e.preventDefault(); first.focus(); }
     }
   });
+  document.addEventListener("change", function(e){
+    if (e.target && e.target.closest && e.target.closest("#modalRoot .seg-choice, #modalRoot .trip-chk, #modalRoot #t_who")) updateTripSummary();
+  });
   var searchTimer = null;
   document.addEventListener("input", function(e){
     var id = e.target && e.target.id;
+    if (e.target && e.target.closest && e.target.closest("#modalRoot .trip-list, #modalRoot #t_total, #modalRoot #t_who")){ updateTripSummary(); return; }
     if (id !== "salesSearch" && id !== "invSearch") return;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function(){
