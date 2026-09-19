@@ -684,6 +684,15 @@
   .owner-queue-row .who .btn{ background:var(--surface); box-shadow:0 1px 2px rgba(60,30,140,.08); }
   .owner-queue-row .who .btn.ghost{ background:transparent; box-shadow:none; color:var(--muted); }
   .owner-queue-row .who{ flex-wrap:wrap; justify-content:flex-end; }
+
+  .confirm-counts{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0; }
+  .cc{ border-radius:18px; padding:14px 10px; text-align:center; color:#fff; }
+  .cc.jon{ background:var(--g-jon); } .cc.jax{ background:var(--g-jax); }
+  .cc b{ display:block; font-size:36px; font-weight:700; line-height:1.1; font-variant-numeric:tabular-nums; }
+  .cc span{ font-size:12px; font-weight:600; opacity:.92; }
+  .confirm-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; max-height:34vh; overflow-y:auto; }
+  .confirm-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 12px; background:var(--surface-2); border-radius:12px; font-size:13px; }
+  .toast-btn{ margin-left:12px; background:rgba(255,255,255,.2); color:inherit; border:0; border-radius:99px; padding:4px 13px; font-weight:700; font-size:13px; cursor:pointer; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2056,6 +2065,11 @@
   function money(n){ var v=Number(n||0); var s=v<0?"-":""; return s+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function fmtDate(iso){ if(!iso) return "—"; var d=new Date(iso+"T00:00:00"); if(isNaN(d)) return "—"; return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
   function daysUntil(iso){ if(!iso) return null; var t=new Date(todayISO()+"T00:00:00"); var d=new Date(iso+"T00:00:00"); if(isNaN(d)) return null; return Math.round((d-t)/86400000); }
+  function toastAction(msg, label, action){
+    var t = el("div", "toast", esc(msg)+" <button type='button' class='toast-btn' data-action='"+action+"'>"+esc(label)+"</button>");
+    $("#toastRoot").appendChild(t);
+    setTimeout(function(){ t.remove(); }, 14000);
+  }
   function toast(msg){ var t=el("div","toast",esc(msg)); $("#toastRoot").appendChild(t); setTimeout(function(){ t.remove(); },2600); }
 
   function productById(id){ return state.products.find(function(p){ return p.id===id; }); }
@@ -2669,6 +2683,7 @@
   // each, including units not sold yet). The split rule below mirrors ebay_sync.py: highest
   // profit per unit goes to Jon until his units are covered, the rest to Jax; sales still in
   // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
+  var lastPurchaseUndo = null, pendingBought = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
   function groupKeyForSale(s){
     var p = productById(s.productId);
@@ -2726,14 +2741,16 @@
     if (!g) return;
     counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
     if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
+    var undo = { created:[], removed:[], sales:[] };
     // the $0 "covers a sale" placeholders are replaced by the real purchase below
     state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && b.note===AUTO_BATCH_NOTE && !Number(b.unitCost); })
-      .forEach(function(b){ deleteBatch(b.id); });
+      .forEach(function(b){ undo.removed.push(Object.assign({}, b)); deleteBatch(b.id); });
     var alloc = allocateSales(g.sales, counts);
     var ownerOf = {};
     g.sales.forEach(function(s){ ownerOf[s.id] = (s.id in alloc) ? alloc[s.id] : s.attributedTo; });
     g.sales.forEach(function(s){
       if (!(s.id in alloc)) return;
+      undo.sales.push({ id:s.id, attributedTo:s.attributedTo||null, needsOwner:!!s.needsOwner, ownerSource:s.ownerSource||null });
       updateSale(s.id, { attributedTo: alloc[s.id], needsOwner: alloc[s.id]===null, ownerSource:"auto" });
     });
     // batches per owner per listing, sized to the sales that owner ends up with; anything bought
@@ -2750,14 +2767,53 @@
         if (!q) return;
         used += q;
         var allShipped = mine.every(function(s){ return s.ebayShipped || s.lifecycleStatus==="completed"; });
-        addBatch({ productId:pid, owner:o, quantity:q, unitCost:0, status: allShipped?"received":"preorder",
-                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:true, note:PURCHASE_NOTE });
+        Promise.resolve(addBatch({ productId:pid, owner:o, quantity:q, unitCost:0, status: allShipped?"received":"preorder",
+                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:true, note:PURCHASE_NOTE }))
+          .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
       });
       var extra = counts[o] - used;
-      if (extra > 0) addBatch({ productId:primary, owner:o, quantity:extra, unitCost:0, status:"received",
-                                receivedDate:todayISO(), expectedArrival:null, needsReview:true, note:PURCHASE_NOTE });
+      if (extra > 0) Promise.resolve(addBatch({ productId:primary, owner:o, quantity:extra, unitCost:0, status:"received",
+                                receivedDate:todayISO(), expectedArrival:null, needsReview:true, note:PURCHASE_NOTE }))
+        .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
     });
-    toast("Saved — sales are split by who bought what");
+    lastPurchaseUndo = undo;
+    toastAction("Saved — sales split by who bought what.", "Undo", "undo-purchase");
+  }
+  function undoPurchase(){
+    var u = lastPurchaseUndo;
+    if (!u){ toast("Nothing to undo"); return; }
+    lastPurchaseUndo = null;
+    u.created.forEach(function(id){ if (id) deleteBatch(id); });
+    u.removed.forEach(function(b){ var d = Object.assign({}, b); delete d.id; addBatch(d); });
+    u.sales.forEach(function(x){ updateSale(x.id, { attributedTo:x.attributedTo, needsOwner:x.needsOwner, ownerSource:x.ownerSource }); });
+    toast("Undone — back to how it was");
+  }
+  // Nothing is written until this screen is confirmed: it shows the exact units per person and
+  // where every sale would land, so a wrong tap is caught here instead of afterwards.
+  function openPurchaseConfirm(key, counts){
+    var g = purchaseGroups().filter(function(x){ return x.key===key; })[0];
+    if (!g) return;
+    counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
+    if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
+    pendingBought = { key:key, counts:counts };
+    var alloc = allocateSales(g.sales, counts), units = { Jon:0, Jax:0 };
+    var rows = g.sales.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
+      var o = (s.id in alloc) ? alloc[s.id] : s.attributedTo, q = Number(s.quantitySold||1);
+      if (o) units[o] += q;
+      return "<div class='confirm-row'><span>"+money(s.netProfit)+" · "+esc(s.buyerName||"buyer")+(q>1?" · ×"+q:"")+"</span>"+(o ? ownerPill(o) : "<span class='badge owner-none'>Unassigned</span>")+"</div>";
+    }).join("");
+    var covered = units.Jon + units.Jax;
+    var notes = "";
+    var extraJon = Math.max(0, counts.Jon - units.Jon), extraJax = Math.max(0, counts.Jax - units.Jax);
+    if (extraJon || extraJax) notes += "<div class='hint'>Bought but not sold yet, kept on hand: "+[extraJon?"Jon "+extraJon:"", extraJax?"Jax "+extraJax:""].filter(Boolean).join(", ")+".</div>";
+    if (covered < g.qty) notes += "<div class='hint warn'>Only "+covered+" of the "+g.qty+" units sold are covered by these counts — the rest stay unassigned.</div>";
+    var p = productById(g.sales[0].productId);
+    openModal("Confirm who bought this",
+      "<div class='sale-sub'>"+esc(p?p.name:"This item")+" — "+g.qty+" sold so far</div>"+
+      "<div class='confirm-counts'><div class='cc jon'><b>"+counts.Jon+"</b><span>Jon bought</span></div><div class='cc jax'><b>"+counts.Jax+"</b><span>Jax bought</span></div></div>"+
+      "<div class='sale-sub' style='margin:2px 0 6px'>Each sale would go to:</div><div class='confirm-list'>"+rows+"</div>"+notes,
+      "<button class='btn' data-action='bought-split' data-key='"+esc(key)+"'>Back</button>"+
+      "<button class='btn primary' data-action='confirm-purchase' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Confirm</button>");
   }
   function openBoughtModal(key){
     var g = purchaseGroups().filter(function(x){ return x.key===key; })[0];
@@ -2765,10 +2821,10 @@
     var p = productById(g.sales[0].productId);
     openModal("Who bought this?",
       "<div class='sale-sub' style='margin-bottom:12px'>"+esc(p?p.name:"This item")+" — "+g.qty+" sold so far.</div>"+
-      "<div class='row2'><div class='field'><label>Jon bought</label><input id='f_bj' type='number' min='0' step='1' value='"+Math.ceil(g.qty/2)+"'></div>"+
-      "<div class='field'><label>Jax bought</label><input id='f_bx' type='number' min='0' step='1' value='"+Math.floor(g.qty/2)+"'></div></div>"+
+      "<div class='row2'><div class='field'><label>Jon bought</label><input id='f_bj' type='number' min='0' step='1' value='"+(pendingBought && pendingBought.key===key ? pendingBought.counts.Jon : Math.ceil(g.qty/2))+"'></div>"+
+      "<div class='field'><label>Jax bought</label><input id='f_bx' type='number' min='0' step='1' value='"+(pendingBought && pendingBought.key===key ? pendingBought.counts.Jax : Math.floor(g.qty/2))+"'></div></div>"+
       "<div class='hint'>Starts as an even split (the extra unit goes to Jon). Enter the total each of you bought, including any you haven't sold yet. As more orders come in, the highest-profit ones go to Jon until his units are covered.</div>",
-      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-bought' data-key='"+esc(key)+"'>Save</button>");
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-bought' data-key='"+esc(key)+"'>Review</button>");
   }
   function renderOwnerBanner(){
     var box = $("#ownerBanner");
@@ -3747,10 +3803,12 @@
       if (cb) cb();
       return;
     }
-    if (action==="bought-all"){ var bg = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (bg){ var bc = { Jon:0, Jax:0 }; bc[t.dataset.who] = bg.qty; applyPurchase(t.dataset.key, bc); } return; }
-    if (action==="bought-even"){ var be = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (be) applyPurchase(t.dataset.key, { Jon:Math.ceil(be.qty/2), Jax:Math.floor(be.qty/2) }); return; }
+    if (action==="bought-all"){ var bg = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (bg){ var bc = { Jon:0, Jax:0 }; bc[t.dataset.who] = bg.qty; openPurchaseConfirm(t.dataset.key, bc); } return; }
+    if (action==="bought-even"){ var be = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (be) openPurchaseConfirm(t.dataset.key, { Jon:Math.ceil(be.qty/2), Jax:Math.floor(be.qty/2) }); return; }
     if (action==="bought-split"){ openBoughtModal(t.dataset.key); return; }
-    if (action==="submit-bought"){ applyPurchase(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); closeModal(); return; }
+    if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
+    if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }); pendingBought = null; closeModal(); return; }
+    if (action==="undo-purchase"){ undoPurchase(); var tt = t.closest(".toast"); if (tt) tt.remove(); return; }
     if (action==="assign-owner"){ assignOwner(t.dataset.id, t.dataset.who); return; }
     if (action==="assign-all-owner"){ needsOwnerSales().forEach(function(s){ assignOwner(s.id, t.dataset.who); }); toast("All assigned to "+t.dataset.who); return; }
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
