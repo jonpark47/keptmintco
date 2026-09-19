@@ -869,6 +869,9 @@
   .owner-queue-row .who .btn.primary{ background:var(--g-brand, var(--accent)); color:#fff; box-shadow:none; }
   .oq-note{ flex:1 1 100%; font-size:13px; color:var(--muted); font-weight:500; }
   @media (pointer: coarse){ .banner button{ min-height:40px; padding:10px 14px; } }
+  .trip-list[data-only]:not([data-only='']) .trip-chk{ display:none; }
+  .trip-list[data-only]:not([data-only='']){ max-height:none; margin-top:0; }
+  .warn-line{ color:var(--accent) !important; font-weight:600 !important; margin-top:3px; }
 </style>
 </head>
 <body data-tab="overview">
@@ -3417,7 +3420,7 @@
   }
 
   function readTrip(){
-    var t = { both: (function(){ var r = document.querySelector("input[name='t_scope']:checked"); return r ? r.value==="all" : true; })(), who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
+    var t = { replace: ($("#t_replace") ? $("#t_replace").checked : true), only: (($(".trip-list")||{dataset:{}}).dataset.only || ""), both: (function(){ var r = document.querySelector("input[name='t_scope']:checked"); return r ? r.value==="all" : true; })(), who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
     var m = document.querySelector("input[name='t_mode']:checked"); if (m) t.mode = m.value;
     document.querySelectorAll(".trip-row").forEach(function(row){
       var key = row.dataset.key;
@@ -3441,8 +3444,12 @@
     var base = round2(subtotal + other);
     var total = Number(t.total)||0, extras = round2(total - base);
     sel.forEach(function(r){
+      var pay = 0, paidUnits = 0;
+      state.sales.forEach(function(sa){ if (r.g.pids.indexOf(sa.productId)!==-1){ pay += Number(sa.netProfit||0); paidUnits += Number(sa.quantitySold||1); } });
+      r.payoutEach = paidUnits ? pay/paidUnits : 0;
       var each = (t.mode==="even" || base<=0) ? ((units+otherUnits) ? extras/(units+otherUnits) : 0) : r.price*(extras/base);
       r.extraEach = each; r.final = round2(r.price + each);
+      r.high = r.payoutEach > 0 && r.final > r.payoutEach;
     });
     var problem = "";
     if (!sel.length) problem = "Tick the items you bought on this trip.";
@@ -3467,51 +3474,33 @@
     if (!g) return { g:null, un:[] };
     return { g:g, un: state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && !costLogged(b); }) };
   }
-  function openItemCostModal(key){
-    var r = unpricedForKey(key), g = r.g, un = r.un;
-    if (!g) return;
-    if (!un.length){ toast("Every unit of this item already has a price"); return; }
-    var by = { Jon:0, Jax:0 };
-    un.forEach(function(b){ if (by[b.owner]!==undefined) by[b.owner] += Number(b.quantity||0); });
-    var owners = ["Jon","Jax"].filter(function(o){ return by[o] > 0; });
-    var total = owners.reduce(function(a,o){ return a + by[o]; }, 0);
-    var sug = suggestedCost(g.pids, owners[0]);
-    var opts = owners.length > 1
-      ? "<div class='field'><label>Apply to</label><div class='seg-choice'>"+
-          "<label><input type='radio' name='ic_scope' value='all' checked> Everyone's units with no price <small>(Jon "+by.Jon+", Jax "+by.Jax+")</small></label>"+
-          owners.map(function(o){ return "<label><input type='radio' name='ic_scope' value='"+o+"'> Just "+o+"'s <small>("+by[o]+")</small></label>"; }).join("")+
-        "</div></div>"
-      : "";
-    openModal("Price for this item",
-      "<div class='sale-sub' style='margin-bottom:10px'>"+esc(g.p.name)+"</div>"+
-      "<div class='hint' style='margin-top:0'>"+total+" unit"+(total===1?"":"s")+" with no price: "+owners.map(function(o){ return o+" "+by[o]; }).join(" · ")+".</div>"+
-      "<div class='field'><label for='ic_cost'>Price per unit ($, tax included)</label>"+
-        "<input id='ic_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+(sug!=null ? sug : "")+"'>"+
-        (sug!=null ? "<div class='hint'>Filled in from the price already logged for this item. Change it if these cost something different, or type 0 if they were free.</div>" : "")+"</div>"+
-      opts+
-      "<input type='hidden' id='ic_key' value='"+esc(key)+"'>",
-      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='item-cost-save'>Save price</button>");
+  // most recent logged price for this item (prefers the same person), so nothing is typed twice
+  function lastCostInfo(pids, owner){
+    var c = state.batches.filter(function(b){ return pids.indexOf(b.productId)!==-1 && costLogged(b); });
+    if (!c.length) return null;
+    var same = c.filter(function(b){ return b.owner===owner; }), pool = same.length ? same : c;
+    var stamp = function(b){ return (b.costMeta && b.costMeta.at) || b.createdAt || 0; };
+    pool.sort(function(x,y){ return stamp(y) - stamp(x); });
+    var top = pool[0], unit = Number(top.unitCost)||0;
+    return { unit:unit, price: (top.costMeta && top.costMeta.price!=null) ? Number(top.costMeta.price) : unit };
   }
-  function saveItemCost(){
-    var key = $("#ic_key").value, raw = $("#ic_cost").value;
-    if (String(raw).trim()===""){ toast("Enter the price, or 0 if it was free"); return false; }
-    var cost = round2(Number(raw));
-    if (!(cost >= 0)){ toast("That price doesn't look right"); return false; }
-    var scopeEl = document.querySelector("input[name='ic_scope']:checked"), scope = scopeEl ? scopeEl.value : "all";
-    var targets = unpricedForKey(key).un.filter(function(b){ return scope==="all" || b.owner===scope; });
-    if (!targets.length){ closeModal(); return; }
-    var undo = { changed:[], created:[] };
-    targets.forEach(function(b){
-      undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
-      updateBatch(b.id, { unitCost:cost, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
-    });
-    lastTripUndo = undo;
-    var units = targets.reduce(function(a,b){ return a + Number(b.quantity||0); }, 0);
-    toastAction(units+" unit"+(units===1?"":"s")+" priced at "+money(cost)+".", "Undo", "undo-trip");
+  // "Add cost" on one item: the same full form as a store trip (price before tax, quantity, order
+  // total, other items, tax spread, who), just for this item, prefilled from what was logged before
+  function openItemTrip(key){
+    var r = unpricedForKey(key), g = r.g;
+    if (!g) return;
+    if (!r.un.length){ toast("Every unit of this item already has a price"); return; }
+    var owners = ["Jon","Jax"].filter(function(o){ return r.un.some(function(b){ return b.owner===o; }); });
+    var who = owners.indexOf(whoAmI)!==-1 ? whoAmI : owners[0];
+    var qty = r.un.filter(function(b){ return b.owner===who; }).reduce(function(a,b){ return a + Number(b.quantity||0); }, 0) || 1;
+    var prior = lastCostInfo(g.pids, who);
+    var items = {}; items[key] = { checked:true, qty:String(qty), price: prior ? String(round2(prior.price)) : "" };
+    pendingTrip = { only:key, who:who, total: prior ? String(round2(qty*prior.unit)) : "", other:"", otherQty:"1", mode:"prop", both:true, replace:false, items:items };
+    openTripModal();
   }
   function openTripModal(){
     var t = pendingTrip || { who:whoAmI, total:"", mode:"prop", items:{} };
-    var rows = productGroupList().map(function(g){
+    var rows = productGroupList().filter(function(g){ return !t.only || g.key===t.only; }).map(function(g){
       var it = t.items[g.key] || {};
       var ownerQty = 0;
       state.batches.forEach(function(b){ if (g.pids.indexOf(b.productId)!==-1 && b.owner===t.who) ownerQty += Number(b.quantity||0); });
@@ -3521,8 +3510,10 @@
         "<div class='trip-nums'><label>Qty<input type='number' class='trip-qty' min='1' step='1' value='"+esc(qty)+"'></label>"+
         "<label>Price each<input type='number' class='trip-price' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(it.price!=null?it.price:"")+"'></label></div></div>";
     }).join("");
-    openModal("Log a store trip",
-      "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost. Everything starts ticked. Untick what wasn't on the receipt; type 0 for anything that was free.</div>"+
+    var listHtml = "<div class='trip-list' data-only='"+esc(t.only||"")+"'>"+rows+"</div>";
+    openModal(t.only ? "Price for this item" : "Log a store trip",
+      (t.only ? "<div class='hint' style='margin-top:0'>Enter what you paid before tax and the order total; the tax is worked out for you. Everything is filled in from what was logged for this item before, so change only what is different.</div>" : "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost. Everything starts ticked. Untick what wasn't on the receipt; type 0 for anything that was free.</div>")+
+      (t.only ? listHtml : "")+
       "<div class='row2'><div class='field'><label>Who paid</label><select id='t_who'>"+ownerOptions(t.who)+"</select></div>"+
       "<div class='field'><label>Total paid at checkout ($)</label><input id='t_total' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.total)+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Other items on the receipt, not listed ($ before tax)</label><input id='t_other' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.other||"")+"'></div>"+
@@ -3532,10 +3523,11 @@
         "<label><input type='radio' name='t_mode' value='prop'"+(t.mode!=="even"?" checked":"")+"> In proportion to price <small>(how sales tax works)</small></label>"+
         "<label><input type='radio' name='t_mode' value='even'"+(t.mode==="even"?" checked":"")+"> Evenly per unit</label></div></div>"+
       "<div class='field'><label>Apply these prices to</label><div class='seg-choice'>"+
-        "<label><input type='radio' name='t_scope' value='all'"+(t.both===false ? "" : " checked")+"> Both Jon and Jax <small>(also fills the other person's units that have no price yet; never overwrites a price that's already logged)</small></label>"+
+        "<label><input type='radio' name='t_scope' value='all'"+(t.both===false ? "" : " checked")+"> Both Jon and Jax <small>(also fills the other person's units that have no price yet; never overwrites their logged prices)</small></label>"+
         "<label><input type='radio' name='t_scope' value='mine'"+(t.both===false ? " checked" : "")+"> <span id='t_only'>Only "+esc(t.who)+"'s units</span></label></div></div>"+
-      "<div class='trip-listhead'><span>Items on this receipt</span><button type='button' class='linkbtn' data-action='trip-toggle-all'>Clear all</button></div>"+
-      "<div class='trip-list'>"+rows+"</div>"+
+      "<label class='check'><input type='checkbox' id='t_replace'"+(t.replace===false ? "" : " checked")+"> <span>Replace prices already logged for "+(t.only ? "this item" : "these items")+" <small>(leave off to only fill units that have no price yet)</small></span></label>"+
+      (t.only ? "" : "<div class='trip-listhead'><span>Items on this receipt</span><button type='button' class='linkbtn' data-action='trip-toggle-all'>Clear all</button></div>")+
+      (t.only ? "" : listHtml)+
       "<div class='trip-summary' id='tripSummary'></div>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='trip-review'>Review</button>", { wide:true });
     updateTripSummary();
@@ -3587,7 +3579,9 @@
     if (c.problem){ toast(c.problem); return; }
     var paidSum = round2(c.rows.reduce(function(a,r){ return a + r.final*r.qty; }, 0));
     var rows = c.rows.map(function(r){
-      return "<div class='confirm-row trip-out'><span>"+esc(r.g.p.name)+"<small>"+r.qty+" × "+money(r.price)+" + "+money(r.extraEach)+" tax &amp; fees</small></span><b>"+money(r.final)+"<small>each</small></b></div>";
+      return "<div class='confirm-row trip-out'><span>"+esc(r.g.p.name)+"<small>"+r.qty+" × "+money(r.price)+" + "+money(r.extraEach)+" tax &amp; fees = "+money(r.final*r.qty)+" for "+r.qty+" unit"+(r.qty===1?"":"s")+"</small>"+
+        (r.high ? "<small class='warn-line'>Check this: it has sold for about "+money(r.payoutEach)+" each, less than this cost. Is the price you typed for ONE unit, not the total for all "+r.qty+"?</small>" : "")+
+        "</span><b>"+money(r.final)+"<small>each</small></b></div>";
     }).join("");
     var otherN = 0;
     if (t.both !== false){
@@ -3596,6 +3590,13 @@
       });
     }
     var bothNote = otherN ? " Also fills in "+otherN+" unit"+(otherN===1?"":"s")+" of "+(t.who==="Jon"?"Jax":"Jon")+"'s that "+(otherN===1?"has":"have")+" no price yet." : "";
+    var pricedMine = 0;
+    c.rows.forEach(function(r){
+      state.batches.forEach(function(b){ if (r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who && costLogged(b)) pricedMine += Number(b.quantity||0); });
+    });
+    if (pricedMine) bothNote += t.replace===false
+      ? " "+pricedMine+" unit"+(pricedMine===1?"":"s")+" of "+t.who+"'s already "+(pricedMine===1?"has":"have")+" a price and "+(pricedMine===1?"is":"are")+" left as "+(pricedMine===1?"it is":"they are")+"."
+      : " Replaces the price on "+pricedMine+" unit"+(pricedMine===1?"":"s")+" that already "+(pricedMine===1?"has":"have")+" one.";
     openModal("Confirm unit costs",
       "<div class='sale-sub'>"+ownerPill(t.who)+" paid "+money(c.total)+" · "+c.units+" unit"+(c.units===1?"":"s")+
         (c.other>0 ? " + "+money(c.other)+" of other items not listed" : "")+"</div>"+
@@ -3609,21 +3610,23 @@
     var c = tripCalc(t); if (c.problem) return;
     var undo = { changed:[], created:[] }, today = todayISO();
     c.rows.forEach(function(r){
-      var mine = state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who; });
+      var ownerAll = state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who; });
+      var mine = t.replace===false ? ownerAll.filter(function(b){ return !costLogged(b); }) : ownerAll;
+      var meta = { price:r.price, qty:r.qty, mode:t.mode, at:Date.now() };
       if (t.both !== false){
         state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner!==t.who && !costLogged(b); }).forEach(function(b){
-          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
-          updateBatch(b.id, { unitCost:r.final, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, costMeta:b.costMeta||null, note:b.note||"", needsReview:!!b.needsReview });
+          updateBatch(b.id, { unitCost:r.final, costKnown:true, costMeta:meta, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
         });
       }
       if (mine.length){
         mine.forEach(function(b){
-          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
-          updateBatch(b.id, { unitCost:r.final, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, costMeta:b.costMeta||null, note:b.note||"", needsReview:!!b.needsReview });
+          updateBatch(b.id, { unitCost:r.final, costKnown:true, costMeta:meta, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
         });
-      } else {
+      } else if (!ownerAll.length){
         var shipped = state.sales.some(function(x){ return r.g.pids.indexOf(x.productId)!==-1 && x.ebayShipped; });
-        Promise.resolve(addBatch({ productId:r.g.ps[0].id, owner:t.who, quantity:r.qty, unitCost:r.final, costKnown:true, status: shipped?"received":"preorder",
+        Promise.resolve(addBatch({ productId:r.g.ps[0].id, owner:t.who, quantity:r.qty, unitCost:r.final, costKnown:true, costMeta:meta, status: shipped?"received":"preorder",
           receivedDate: shipped?today:null, expectedArrival:null, needsReview:false, note:"Store trip "+fmtDate(today) }))
           .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
       }
@@ -3636,7 +3639,7 @@
     if (!u){ toast("Nothing to undo"); return; }
     lastTripUndo = null;
     u.created.forEach(function(id){ if (id) deleteBatch(id); });
-    u.changed.forEach(function(x){ updateBatch(x.id, { unitCost:x.unitCost, costKnown:x.costKnown, note:x.note, needsReview:x.needsReview }); });
+    u.changed.forEach(function(x){ updateBatch(x.id, { unitCost:x.unitCost, costKnown:x.costKnown, costMeta:x.costMeta||null, note:x.note, needsReview:x.needsReview }); });
     toast("Undone — costs restored");
   }
 
@@ -3796,7 +3799,7 @@
       "<div class='sale-main'>"+
         "<div class='sale-title'>"+esc(name)+"</div>"+
         "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
-        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(saleProfit(s)==null ? costPill() : "")+"</div>"+
+        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(saleProfit(s)==null ? costPill() : (saleProfit(s) < 0 ? "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Loss, check the cost</span>" : ""))+"</div>"+
       "</div>"+
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
@@ -4616,8 +4619,7 @@
       pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: allItems };
       openTripModal(); return;
     }
-    if (action==="cost-one"){ openItemCostModal(t.dataset.key); return; }
-    if (action==="item-cost-save"){ if (saveItemCost() !== false) closeModal(); return; }
+    if (action==="cost-one"){ openItemTrip(t.dataset.key); return; }
     if (action==="inv-filter"){ invFilter = t.dataset.f; render(); return; }
     if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
