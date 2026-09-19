@@ -3461,6 +3461,54 @@
     }
     box.innerHTML = "Items "+money(c.subtotal)+(c.other>0 ? " · not listed "+money(c.other) : "")+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
   }
+  // ---- one item, its unpriced units: a small window prefilled with the price already logged ----
+  function unpricedForKey(key){
+    var g = productGroupList().filter(function(x){ return x.key===key; })[0];
+    if (!g) return { g:null, un:[] };
+    return { g:g, un: state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && !costLogged(b); }) };
+  }
+  function openItemCostModal(key){
+    var r = unpricedForKey(key), g = r.g, un = r.un;
+    if (!g) return;
+    if (!un.length){ toast("Every unit of this item already has a price"); return; }
+    var by = { Jon:0, Jax:0 };
+    un.forEach(function(b){ if (by[b.owner]!==undefined) by[b.owner] += Number(b.quantity||0); });
+    var owners = ["Jon","Jax"].filter(function(o){ return by[o] > 0; });
+    var total = owners.reduce(function(a,o){ return a + by[o]; }, 0);
+    var sug = suggestedCost(g.pids, owners[0]);
+    var opts = owners.length > 1
+      ? "<div class='field'><label>Apply to</label><div class='seg-choice'>"+
+          "<label><input type='radio' name='ic_scope' value='all' checked> Everyone's units with no price <small>(Jon "+by.Jon+", Jax "+by.Jax+")</small></label>"+
+          owners.map(function(o){ return "<label><input type='radio' name='ic_scope' value='"+o+"'> Just "+o+"'s <small>("+by[o]+")</small></label>"; }).join("")+
+        "</div></div>"
+      : "";
+    openModal("Price for this item",
+      "<div class='sale-sub' style='margin-bottom:10px'>"+esc(g.p.name)+"</div>"+
+      "<div class='hint' style='margin-top:0'>"+total+" unit"+(total===1?"":"s")+" with no price: "+owners.map(function(o){ return o+" "+by[o]; }).join(" · ")+".</div>"+
+      "<div class='field'><label for='ic_cost'>Price per unit ($, tax included)</label>"+
+        "<input id='ic_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+(sug!=null ? sug : "")+"'>"+
+        (sug!=null ? "<div class='hint'>Filled in from the price already logged for this item. Change it if these cost something different, or type 0 if they were free.</div>" : "")+"</div>"+
+      opts+
+      "<input type='hidden' id='ic_key' value='"+esc(key)+"'>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='item-cost-save'>Save price</button>");
+  }
+  function saveItemCost(){
+    var key = $("#ic_key").value, raw = $("#ic_cost").value;
+    if (String(raw).trim()===""){ toast("Enter the price, or 0 if it was free"); return false; }
+    var cost = round2(Number(raw));
+    if (!(cost >= 0)){ toast("That price doesn't look right"); return false; }
+    var scopeEl = document.querySelector("input[name='ic_scope']:checked"), scope = scopeEl ? scopeEl.value : "all";
+    var targets = unpricedForKey(key).un.filter(function(b){ return scope==="all" || b.owner===scope; });
+    if (!targets.length){ closeModal(); return; }
+    var undo = { changed:[], created:[] };
+    targets.forEach(function(b){
+      undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
+      updateBatch(b.id, { unitCost:cost, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+    });
+    lastTripUndo = undo;
+    var units = targets.reduce(function(a,b){ return a + Number(b.quantity||0); }, 0);
+    toastAction(units+" unit"+(units===1?"":"s")+" priced at "+money(cost)+".", "Undo", "undo-trip");
+  }
   function openTripModal(){
     var t = pendingTrip || { who:whoAmI, total:"", mode:"prop", items:{} };
     var rows = productGroupList().map(function(g){
@@ -4568,12 +4616,8 @@
       pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: allItems };
       openTripModal(); return;
     }
-    if (action==="cost-one"){
-      var items = {};
-      productGroupList().forEach(function(g){ items[g.key] = { checked: g.key===t.dataset.key }; });
-      pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: items };
-      openTripModal(); return;
-    }
+    if (action==="cost-one"){ openItemCostModal(t.dataset.key); return; }
+    if (action==="item-cost-save"){ if (saveItemCost() !== false) closeModal(); return; }
     if (action==="inv-filter"){ invFilter = t.dataset.f; render(); return; }
     if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
