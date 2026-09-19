@@ -826,6 +826,19 @@
     .owner-queue-row .who .btn{ flex:1 1 auto; justify-content:center; }
     .owner-queue-row .amt{ flex:0 0 auto; }
   }
+
+  /* attention states use the brand violet tint, not orange boxes */
+  .banner{ background:var(--accent-soft); }
+  .banner .ic{ color:var(--accent); }
+  .short-note{ background:var(--accent-soft); color:var(--ink); }
+  .badge.owner-none{ background:transparent; color:var(--muted); border:1px dashed var(--muted); }
+  .badge.review{ background:var(--accent-soft); color:var(--accent); }
+  .hint.warn{ color:var(--accent); }
+  .trip-row{ border:2px solid transparent; }
+  .trip-row.missing{ outline:none; border:2px dashed var(--accent); background:var(--accent-soft); }
+  .trip-blankbar{ background:var(--accent-soft); }
+  .trip-warn span, .trip-blankbar span{ color:var(--accent); }
+  .warn-dot{ background:var(--accent); }
 </style>
 </head>
 <body data-tab="overview">
@@ -3291,7 +3304,7 @@
   function round2(v){ return Math.round(v*100)/100; }
 
   function readTrip(){
-    var t = { who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", mode: "prop", items:{} };
+    var t = { who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
     var m = document.querySelector("input[name='t_mode']:checked"); if (m) t.mode = m.value;
     document.querySelectorAll(".trip-row").forEach(function(row){
       var key = row.dataset.key;
@@ -3308,22 +3321,27 @@
     var subtotal = 0, units = 0;
     sel.forEach(function(r){ subtotal += r.qty*r.price; units += r.qty; });
     subtotal = round2(subtotal);
-    var total = Number(t.total)||0, extras = round2(total - subtotal);
+    // things bought on the same receipt that aren't in the list (an item that hasn't sold yet):
+    // their price is not tax, and they take their own share of the tax
+    var other = Math.max(0, Number(t.other)||0);
+    var otherUnits = other > 0 ? Math.max(1, Math.floor(Number(t.otherQty)||1)) : 0;
+    var base = round2(subtotal + other);
+    var total = Number(t.total)||0, extras = round2(total - base);
     sel.forEach(function(r){
-      var each = (t.mode==="even" || subtotal<=0) ? (units ? extras/units : 0) : r.price*(extras/subtotal);
+      var each = (t.mode==="even" || base<=0) ? ((units+otherUnits) ? extras/(units+otherUnits) : 0) : r.price*(extras/base);
       r.extraEach = each; r.final = round2(r.price + each);
     });
     var problem = "";
     if (!sel.length) problem = "Tick the items you bought on this trip.";
     else if (sel.some(function(r){ return r.blank; })) problem = "Some items have no price yet. Enter it, tap \u201cIt was $0\u201d, or skip the item.";
     else if (String(t.total).trim()==="") problem = "Enter the total you paid at checkout.";
-    return { rows:sel, subtotal:subtotal, units:units, total:total, extras:extras, rate: subtotal>0 ? extras/subtotal : 0, problem:problem };
+    return { rows:sel, subtotal:subtotal, units:units, other:other, otherUnits:otherUnits, base:base, total:total, extras:extras, rate: base>0 ? extras/base : 0, problem:problem };
   }
   function updateTripSummary(){
     var box = $("#tripSummary"); if (!box) return;
     var c = tripCalc(readTrip());
     if (c.problem){ box.innerHTML = "<span class='muted'>"+esc(c.problem)+"</span>"; return; }
-    box.innerHTML = "Items "+money(c.subtotal)+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
+    box.innerHTML = "Items "+money(c.subtotal)+(c.other>0 ? " · not listed "+money(c.other) : "")+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
   }
   function openTripModal(){
     var t = pendingTrip || { who:whoAmI, total:"", mode:"prop", items:{} };
@@ -3341,6 +3359,9 @@
       "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost. Everything starts ticked. Untick what wasn't on the receipt; type 0 for anything that was free.</div>"+
       "<div class='row2'><div class='field'><label>Who paid</label><select id='t_who'>"+ownerOptions(t.who)+"</select></div>"+
       "<div class='field'><label>Total paid at checkout ($)</label><input id='t_total' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.total)+"'></div></div>"+
+      "<div class='row2'><div class='field'><label>Other items on the receipt, not listed ($ before tax)</label><input id='t_other' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.other||"")+"'></div>"+
+      "<div class='field'><label>How many</label><input id='t_otherqty' type='number' min='1' step='1' value='"+esc(t.otherQty||1)+"'></div></div>"+
+      "<div class='hint' style='margin-top:-6px;margin-bottom:12px'>For anything on this receipt that isn't in the list below, like an item that hasn't sold yet. Its price is taken out before the tax is worked out, so the listed items aren't charged for it.</div>"+
       "<div class='field'><label>Spread tax &amp; fees</label><div class='seg-choice'>"+
         "<label><input type='radio' name='t_mode' value='prop'"+(t.mode!=="even"?" checked":"")+"> In proportion to price <small>(how sales tax works)</small></label>"+
         "<label><input type='radio' name='t_mode' value='even'"+(t.mode==="even"?" checked":"")+"> Evenly per unit</label></div></div>"+
@@ -3390,7 +3411,7 @@
       flagTripMissing(blanks);
       var firstMiss = document.querySelector(".trip-row.missing");
       if (firstMiss && firstMiss.scrollIntoView) firstMiss.scrollIntoView({ block:"center", behavior:"smooth" });
-      toast(blanks.length+" item"+(blanks.length>1?"s":"")+" still need a price. Enter it, tap \u201cIt was $0\u201d, or skip.");
+      toast((blanks.length===1 ? "1 item still needs a price" : blanks.length+" items still need a price")+". Enter it, tap \u201cIt was $0\u201d, or skip.");
       return;
     }
     var c = tripCalc(t);
@@ -3400,7 +3421,8 @@
       return "<div class='confirm-row trip-out'><span>"+esc(r.g.p.name)+"<small>"+r.qty+" × "+money(r.price)+" + "+money(r.extraEach)+" tax &amp; fees</small></span><b>"+money(r.final)+"<small>each</small></b></div>";
     }).join("");
     openModal("Confirm unit costs",
-      "<div class='sale-sub'>"+ownerPill(t.who)+" paid "+money(c.total)+" · "+c.units+" unit"+(c.units===1?"":"s")+"</div>"+
+      "<div class='sale-sub'>"+ownerPill(t.who)+" paid "+money(c.total)+" · "+c.units+" unit"+(c.units===1?"":"s")+
+        (c.other>0 ? " + "+money(c.other)+" of other items not listed" : "")+"</div>"+
       "<div class='confirm-list' style='margin-top:10px'>"+rows+"</div>"+
       "<div class='hint'>These become the unit cost on "+esc(t.who)+"'s batches of each item"+(Math.abs(paidSum-c.total)>=0.01 ? " (rounded to the cent, "+money(paidSum)+" in total)" : "")+
       ". An item with no batch for "+esc(t.who)+" gets one created. You can undo right after.</div>",
@@ -4715,7 +4737,7 @@
   var searchTimer = null;
   document.addEventListener("input", function(e){
     var id = e.target && e.target.id;
-    if (e.target && e.target.closest && e.target.closest("#modalRoot .trip-list, #modalRoot #t_total, #modalRoot #t_who")){
+    if (e.target && e.target.closest && e.target.closest("#modalRoot .trip-list, #modalRoot #t_total, #modalRoot #t_who, #modalRoot #t_other, #modalRoot #t_otherqty")){
       if (e.target.classList.contains("trip-price") && e.target.value !== "") clearTripFlag(e.target.closest(".trip-row"));
       updateTripSummary(); return;
     }
