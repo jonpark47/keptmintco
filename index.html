@@ -705,6 +705,11 @@
     .tiles.mini .tile .eyebrow, .stat span{ font-size:11px; letter-spacing:.04em; }
     .tiles.mini .tile .sub{ font-size:11.5px; }
   }
+
+  .split-line{ display:flex; align-items:center; gap:8px; padding:0 16px 10px; font-size:12.5px; color:var(--muted); font-weight:600; }
+  .split-line b{ color:var(--ink); font-size:15px; font-variant-numeric:tabular-nums; margin-right:6px; }
+  .cost-missing{ color:var(--muted); }
+  .cost-known{ font-weight:600; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2704,9 +2709,36 @@
   // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
   var lastPurchaseUndo = null, pendingBought = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
+  function nameKey(name){ return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
   function groupKeyForSale(s){
     var p = productById(s.productId);
-    return String((p && p.name) || s.productId || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+    return nameKey((p && p.name) || s.productId);
+  }
+  function pidsForKey(k){ return state.products.filter(function(p){ return nameKey(p.name)===k; }).map(function(p){ return p.id; }); }
+  // "net profit" is really eBay's payout (after fees and label). Real profit also subtracts what
+  // the owner paid, so it only exists once a unit cost has been entered for that owner's stock.
+  // The balance between Jon and Jax always uses the payout, never this.
+  function unitCostFor(s){
+    if (!s.attributedTo) return null;
+    var pids = pidsForKey(groupKeyForSale(s)), qty = 0, tot = 0;
+    state.batches.forEach(function(b){
+      if (pids.indexOf(b.productId)===-1 || b.owner!==s.attributedTo || !Number(b.unitCost)) return;
+      qty += Number(b.quantity||0); tot += Number(b.quantity||0)*Number(b.unitCost);
+    });
+    return qty ? tot/qty : null;
+  }
+  function saleProfit(s){
+    var u = unitCostFor(s);
+    return u==null ? null : Number(s.netProfit||0) - u*Number(s.quantitySold||1);
+  }
+  function ownerRealProfit(owner){
+    var known = 0, missing = 0;
+    state.sales.forEach(function(s){
+      if (s.attributedTo!==owner) return;
+      var pr = saleProfit(s);
+      if (pr==null) missing++; else known += pr;
+    });
+    return { profit:known, missing:missing };
   }
   function realUnitsFor(pids){
     var u = { Jon:0, Jax:0 };
@@ -2904,7 +2936,7 @@
     var myTied = cashTiedUp(whoAmI), otherTied = cashTiedUp(other);
     var pending = pendingProfit();
     var html = "<div class='tiles'>"+
-      "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>"+
+      "<div class='tile t-profit'><div class='eyebrow'>Total payout</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>"+
       "<div class='tile t-"+(whoAmI==="Jon"?"jon":"jax")+"'><div class='eyebrow'>Your preorders</div><div class='value'>"+money(myTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
       "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
       "</div>";
@@ -2959,14 +2991,27 @@
     // real, SEO-stuffed eBay listing title closely enough to link to it, which used to silently
     // create a duplicate product. Products now come from real orders, so every name is the real
     // listing title and later orders for the same listing keep matching cleanly.
-    var html = "<div class='section-head'><h2>Products</h2><span class='count'>"+state.products.length+" item"+(state.products.length===1?"":"s")+"</span></div>";
+    // Separate eBay listings of the same product are shown as one card (stock and batches
+    // combined, split per person); the data underneath is untouched.
+    var pgroups = {};
+    state.products.forEach(function(p){ var k = nameKey(p.name); (pgroups[k] = pgroups[k] || []).push(p); });
+    var plist = Object.keys(pgroups).map(function(k){
+      var ps = pgroups[k].slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+      var img = ps.filter(function(x){ return x.imageUrl; })[0];
+      return { key:k, ps:ps, p: Object.assign({}, ps[0], { imageUrl: img ? img.imageUrl : ps[0].imageUrl }), pids: ps.map(function(x){ return x.id; }) };
+    }).sort(function(a,b){ return (b.ps[0].createdAt||0)-(a.ps[0].createdAt||0); });
+    var html = "<div class='section-head'><h2>Products</h2><span class='count'>"+plist.length+" item"+(plist.length===1?"":"s")+"</span></div>";
     if (!state.products.length){
       html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — orders sync in from eBay on their own and this fills in automatically.</div>";
       return html;
     }
-    state.products.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); }).forEach(function(p){
-      var stock = stockFor(p.id);
-      var batches = state.batches.filter(function(b){ return b.productId===p.id; });
+    plist.forEach(function(grp){
+      var p = grp.p, pid = grp.ps[0].id;
+      var stock = { received:0, pipeline:0, sold:0, remaining:0 };
+      grp.pids.forEach(function(id){ var st = stockFor(id); stock.received += st.received; stock.pipeline += st.pipeline; stock.sold += st.sold; stock.remaining += st.remaining; });
+      var batches = state.batches.filter(function(b){ return grp.pids.indexOf(b.productId)!==-1; });
+      var split = { Jon:0, Jax:0 };
+      batches.forEach(function(b){ if (split[b.owner]===undefined || (b.note===AUTO_BATCH_NOTE && !Number(b.unitCost))) return; split[b.owner] += Number(b.quantity||0); });
       var onHand = Math.max(0, stock.remaining), short = Math.max(0, -stock.remaining);
       html += "<div class='card product-card'>"+
         "<div class='product-head'><div class='product-title'>"+prodThumb(p, p.name, "lg")+
@@ -2976,9 +3021,10 @@
           "<div class='stat'><b>"+stock.sold+"</b><span>Sold</span></div>"+
           "<div class='stat'><b>"+onHand+"</b><span>On hand</span></div>"+
           "<div class='stat warn'><b>"+stock.pipeline+"</b><span>Incoming</span></div>"+
-        "</div>";
+        "</div>"+
+        ((split.Jon||split.Jax) ? "<div class='split-line'><span>Bought by</span>"+ownerPill("Jon")+"<b>"+split.Jon+"</b>"+ownerPill("Jax")+"<b>"+split.Jax+"</b></div>" : "");
       if (short){
-        var unowned = state.sales.filter(function(x){ return x.productId===p.id && !x.attributedTo; }).length;
+        var unowned = state.sales.filter(function(x){ return grp.pids.indexOf(x.productId)!==-1 && !x.attributedTo; }).length;
         var msg = unowned
           ? "Not counted yet — pick who gets the sale (or who bought it) at the top of Overview and this fills in."
           : (stock.pipeline > 0
@@ -3011,8 +3057,8 @@
         html += "</div>";
       }
       html += "<div class='card-actions'>"+
-        "<button class='btn small' data-action='open-add-batch' data-product='"+p.id+"'><span class='ic' data-icon='plus'></span> Add batch</button>"+
-        "<button class='btn small' data-action='open-add-sale' data-product='"+p.id+"'><span class='ic' data-icon='plus'></span> Record sale</button>"+
+        "<button class='btn small' data-action='open-add-batch' data-product='"+pid+"'><span class='ic' data-icon='plus'></span> Add batch</button>"+
+        "<button class='btn small' data-action='open-add-sale' data-product='"+pid+"'><span class='ic' data-icon='plus'></span> Record sale</button>"+
         "</div></div>";
     });
     return html;
@@ -3078,7 +3124,8 @@
         "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
         "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+"</div>"+
       "</div>"+
-      "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>net profit</div></div>"+
+      "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
+        (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
       "<div class='sale-actions'>"+recvBtn+
         (hasShot ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
         "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
@@ -3090,7 +3137,7 @@
     var rows = state.sales.slice().sort(bySaleNewest);
     var total = totalNetProfit(), pending = pendingProfit();
     var html = "<div class='tiles mini'>"+
-      "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
+      "<div class='tile t-profit'><div class='eyebrow'>Total payout</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
       "<div class='tile t-pending'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending)+"</div><div class='sub'>waiting on eBay</div></div>"+
       "<div class='tile t-brand'><div class='eyebrow'>Paid out</div><div class='value'>"+money(total-pending)+"</div><div class='sub'>ready to collect</div></div>"+
       "</div>";
@@ -3134,7 +3181,10 @@
     var mineSub = mine.pendingCount
       ? money(mine.available)+" available · "+money(mine.pending)+" pending across "+mine.pendingCount+" sale"+(mine.pendingCount===1?"":"s")
       : money(mine.available)+" available · nothing pending right now";
-    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your net profit</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div></div>";
+    var rp = ownerRealProfit(whoAmI);
+    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div>"+
+      "<div class='tile t-brand'><div class='eyebrow'>Your profit</div><div class='value'>"+(rp.missing ? "—" : money(rp.profit))+"</div><div class='sub'>"+
+        (rp.missing ? "Add the unit cost on "+rp.missing+" sale"+(rp.missing===1?"":"s")+" (Inventory, Edit batch) and this fills in." : "Payout minus what you paid.")+"</div></div></div>";
 
     html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
     html += "<div class='tiles'>"+
@@ -3223,7 +3273,7 @@
       "<div class='field'><label>Item</label><select id='f_product'>"+productOptions(productId)+"</select></div>"+
       "<div class='row2'><div class='field'><label>Quantity sold</label><input id='f_qty' type='number' min='1' step='1' value='1'></div>"+
       "<div class='field'><label>Sale date</label><input id='f_date' type='date' value='"+todayISO()+"'></div></div>"+
-      "<div class='row2'><div class='field'><label>Net profit ($)</label><input id='f_profit' type='number' step='0.01' placeholder='After eBay fees & shipping' required></div>"+
+      "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' placeholder='After eBay fees & shipping' required></div>"+
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' placeholder='0.00'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username (optional)</label><input id='f_buyer' type='text' placeholder='eBay username, e.g. cancerv_96'></div>"+
       "<div class='field'><label>Order # (optional)</label><input id='f_ordernum' type='text' placeholder='11-15148-37978'></div></div>"+
@@ -3244,7 +3294,7 @@
       "<div class='field'><label>Item</label><select id='f_product'>"+productOptions(s.productId)+"</select></div>"+
       "<div class='row2'><div class='field'><label>Quantity sold</label><input id='f_qty' type='number' min='1' step='1' value='"+s.quantitySold+"'></div>"+
       "<div class='field'><label>Sale date</label><input id='f_date' type='date' value='"+(s.saleDate||todayISO())+"'></div></div>"+
-      "<div class='row2'><div class='field'><label>Net profit ($)</label><input id='f_profit' type='number' step='0.01' value='"+s.netProfit+"'></div>"+
+      "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' value='"+s.netProfit+"'></div>"+
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' value='"+(s.soldPrice||"")+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username</label><input id='f_buyer' type='text' value='"+esc(s.buyerName||"")+"'></div>"+
       "<div class='field'><label>Order #</label><input id='f_ordernum' type='text' value='"+esc(s.orderNumber||"")+"'></div></div>"+
@@ -3273,7 +3323,7 @@
     var kv = [
       ["Item", p?p.name:"—"], ["Buyer", s.buyerName||"—"], ["Order #", s.orderNumber||"—"],
       ["Sale date", fmtDate(s.saleDate)], ["Quantity", s.quantitySold],
-      ["Sold price", s.soldPrice?money(s.soldPrice):"—"], ["Net profit", money(s.netProfit)],
+      ["Sold price", s.soldPrice?money(s.soldPrice):"—"], ["Payout", money(s.netProfit)],
       ["Goes to", s.attributedTo||"Unassigned"], ["Funds status", s.lifecycleStatus==="completed"?"Paid out":"Pending payout"],
       ["Stock status", stockLabel]
     ];
@@ -3401,7 +3451,7 @@
       "<div class='field'><label>New item name</label><input id='f_new_title' type='text' value='"+esc(primaryTitle||"")+"' placeholder='Only used if Item above is left as “new item”'></div>"+
       "<div class='row2'><div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='"+(qty||1)+"'></div>"+
       "<div class='field'><label>Sale date</label><input id='f_date' type='date' value='"+(saleDate||todayISO())+"'>"+fieldHint("buyerPaidDate")+"</div></div>"+
-      "<div class='row2'><div class='field'><label>Net profit ($)</label><input id='f_profit' type='number' step='0.01' value='"+(profit!=null?profit:"")+"' placeholder='eBay “Order earnings”'>"+fieldHint("orderEarnings")+"</div>"+
+      "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' value='"+(profit!=null?profit:"")+"' placeholder='eBay “Order earnings”'>"+fieldHint("orderEarnings")+"</div>"+
       "<div class='field'><label>Sold price</label><input id='f_price' type='number' step='0.01' value='"+(soldPrice!=null?soldPrice:"")+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username</label><input id='f_buyer' type='text' value='"+esc(buyer||"")+"'>"+fieldHint("buyerName")+"</div>"+
       "<div class='field'><label>Order #</label><input id='f_ordernum' type='text' value='"+esc(orderNum||"")+"'>"+fieldHint("orderNumber")+
@@ -3907,7 +3957,7 @@
       var pid2 = $("#f_product").value;
       if (!pid2){ toast("Pick an item"); return; }
       var profit = $("#f_profit").value;
-      if (profit===""){ toast("Enter the net profit"); return; }
+      if (profit===""){ toast("Enter the payout"); return; }
       var addQty = Number($("#f_qty").value)||1;
       var addDate = $("#f_date").value || todayISO();
       var addWho = $("#f_who").value;
@@ -3973,7 +4023,7 @@
       var screenshotId = $("#f_screenshot").value;
       var matchedSaleId = $("#f_matched_sale").value;
       var profitVal = $("#f_profit").value;
-      if (profitVal===""){ toast("Enter the net profit (eBay's “Order earnings”)"); return; }
+      if (profitVal===""){ toast("Enter the payout (eBay's “Order earnings”)"); return; }
 
       var finishSave = function(pid){
         var fundsVal = $("#f_funds").value;
