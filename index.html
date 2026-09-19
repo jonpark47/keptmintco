@@ -807,6 +807,15 @@
   .trip-cta-text b{ font-size:15px; font-weight:700; }
   .trip-cta-text small{ font-size:12.5px; opacity:.92; line-height:1.35; }
   .trip-cta-go{ flex:0 0 auto; background:#fff; color:var(--tabc, var(--accent)); font-weight:700; font-size:13px; padding:8px 16px; border-radius:99px; }
+
+  .trip-listhead{ display:flex; align-items:center; justify-content:space-between; margin:6px 0 4px; font-size:12.5px; font-weight:700; color:var(--muted); }
+  .linkbtn{ background:none; border:0; color:var(--accent); font:inherit; font-weight:700; cursor:pointer; padding:8px 4px; min-height:36px; }
+  .trip-row.missing{ outline:2px solid var(--warn); background:var(--warn-soft); }
+  .trip-warn{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .trip-warn span{ flex:1 1 100%; font-size:12.5px; font-weight:700; color:var(--warn); }
+  .trip-blankbar{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; background:var(--warn-soft); border-radius:14px; padding:10px 12px; margin-bottom:8px; }
+  .trip-blankbar span{ flex:1 1 100%; font-size:13px; font-weight:700; color:var(--warn); }
+  .warn-dot{ display:inline-grid; place-items:center; width:18px; height:18px; border-radius:50%; background:var(--warn); color:#fff; font-style:normal; font-size:12px; margin-right:7px; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2885,7 +2894,7 @@
     if (!s.attributedTo) return null;
     var pids = pidsForKey(groupKeyForSale(s)), qty = 0, tot = 0;
     state.batches.forEach(function(b){
-      if (pids.indexOf(b.productId)===-1 || b.owner!==s.attributedTo || !Number(b.unitCost)) return;
+      if (pids.indexOf(b.productId)===-1 || b.owner!==s.attributedTo || (!Number(b.unitCost) && !b.costKnown)) return;
       qty += Number(b.quantity||0); tot += Number(b.quantity||0)*Number(b.unitCost);
     });
     return qty ? tot/qty : null;
@@ -2955,7 +2964,8 @@
     if (!g) return;
     counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
     if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
-    var cost = Number(unitCost) > 0 ? round2(Number(unitCost)) : 0;
+    var costKnown = String(unitCost==null ? "" : unitCost).trim() !== "" && Number(unitCost) >= 0;
+    var cost = costKnown ? round2(Number(unitCost)) : 0;
     var undo = { created:[], removed:[], sales:[] };
     // the $0 "covers a sale" placeholders are replaced by the real purchase below
     state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && b.note===AUTO_BATCH_NOTE && !Number(b.unitCost); })
@@ -2982,17 +2992,17 @@
         if (!q) return;
         used += q;
         var allShipped = mine.every(function(s){ return s.ebayShipped || s.lifecycleStatus==="completed"; });
-        Promise.resolve(addBatch({ productId:pid, owner:o, quantity:q, unitCost:cost, status: allShipped?"received":"preorder",
-                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:!cost, note:cost ? "" : PURCHASE_NOTE }))
+        Promise.resolve(addBatch({ productId:pid, owner:o, quantity:q, unitCost:cost, costKnown:costKnown, status: allShipped?"received":"preorder",
+                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:!costKnown, note:costKnown ? "" : PURCHASE_NOTE }))
           .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
       });
       var extra = counts[o] - used;
-      if (extra > 0) Promise.resolve(addBatch({ productId:primary, owner:o, quantity:extra, unitCost:cost, status:"received",
-                                receivedDate:todayISO(), expectedArrival:null, needsReview:!cost, note:cost ? "" : PURCHASE_NOTE }))
+      if (extra > 0) Promise.resolve(addBatch({ productId:primary, owner:o, quantity:extra, unitCost:cost, costKnown:costKnown, status:"received",
+                                receivedDate:todayISO(), expectedArrival:null, needsReview:!costKnown, note:costKnown ? "" : PURCHASE_NOTE }))
         .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
     });
     lastPurchaseUndo = undo;
-    toastAction(cost ? "Saved — sales split and unit cost set to "+money(cost)+"." : "Saved — sales split by who bought what.", "Undo", "undo-purchase");
+    toastAction(costKnown ? "Saved — sales split and unit cost set to "+money(cost)+"." : "Saved — sales split by who bought what.", "Undo", "undo-purchase");
   }
   function undoPurchase(){
     var u = lastPurchaseUndo;
@@ -3029,7 +3039,7 @@
       "<div class='sale-sub' style='margin:2px 0 6px'>Each sale would go to:</div><div class='confirm-list'>"+rows+"</div>"+notes+
       "<div class='field' style='margin-top:14px'><label for='p_cost'>Unit cost each ($) <span class='opt'>optional</span></label>"+
       "<input id='p_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(pendingBought.cost)+"'>"+
-      "<div class='hint'>What you paid per unit, tax included. Leave it blank to add it later; profit fills in once it's set.</div></div>",
+      "<div class='hint'>What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set.</div></div>",
       "<button class='btn' data-action='bought-split' data-key='"+esc(key)+"'>Back</button>"+
       "<button class='btn primary' data-action='confirm-purchase' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Confirm</button>");
   }
@@ -3293,20 +3303,20 @@
     var sel = [];
     productGroupList().forEach(function(g){
       var it = t.items[g.key]; if (!it || !it.checked) return;
-      sel.push({ g:g, qty: Math.max(1, Math.floor(Number(it.qty)||1)), price: Number(it.price)||0 });
+      sel.push({ g:g, qty: Math.max(1, Math.floor(Number(it.qty)||1)), price: Number(it.price)||0, blank: String(it.price==null?"":it.price).trim()==="" });
     });
     var subtotal = 0, units = 0;
     sel.forEach(function(r){ subtotal += r.qty*r.price; units += r.qty; });
     subtotal = round2(subtotal);
     var total = Number(t.total)||0, extras = round2(total - subtotal);
     sel.forEach(function(r){
-      var each = t.mode==="even" ? (units ? extras/units : 0) : (subtotal>0 ? r.price*(extras/subtotal) : 0);
+      var each = (t.mode==="even" || subtotal<=0) ? (units ? extras/units : 0) : r.price*(extras/subtotal);
       r.extraEach = each; r.final = round2(r.price + each);
     });
     var problem = "";
     if (!sel.length) problem = "Tick the items you bought on this trip.";
-    else if (sel.some(function(r){ return !(r.price>0); })) problem = "Enter the price for each ticked item (before tax).";
-    else if (!(total>0)) problem = "Enter the total you paid at checkout.";
+    else if (sel.some(function(r){ return r.blank; })) problem = "Some items have no price yet. Enter it, tap \u201cIt was $0\u201d, or skip the item.";
+    else if (String(t.total).trim()==="") problem = "Enter the total you paid at checkout.";
     return { rows:sel, subtotal:subtotal, units:units, total:total, extras:extras, rate: subtotal>0 ? extras/subtotal : 0, problem:problem };
   }
   function updateTripSummary(){
@@ -3323,24 +3333,66 @@
       state.batches.forEach(function(b){ if (g.pids.indexOf(b.productId)!==-1 && b.owner===t.who) ownerQty += Number(b.quantity||0); });
       var qty = it.qty!=null && it.qty!=="" ? it.qty : (ownerQty || groupStock(g.pids).sold || 1);
       return "<div class='trip-row' data-key='"+esc(g.key)+"'>"+
-        "<label class='trip-pick'><input type='checkbox' class='trip-chk'"+(it.checked?" checked":"")+"> "+prodThumb(g.p, g.p.name)+"<span class='trip-name'>"+esc(g.p.name)+"</span></label>"+
+        "<label class='trip-pick'><input type='checkbox' class='trip-chk'"+(it.checked===false ? "" : " checked")+"> "+prodThumb(g.p, g.p.name)+"<span class='trip-name'>"+esc(g.p.name)+"</span></label>"+
         "<div class='trip-nums'><label>Qty<input type='number' class='trip-qty' min='1' step='1' value='"+esc(qty)+"'></label>"+
         "<label>Price each<input type='number' class='trip-price' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(it.price!=null?it.price:"")+"'></label></div></div>";
     }).join("");
     openModal("Log a store trip",
-      "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost.</div>"+
+      "<div class='hint' style='margin-top:0'>One receipt, several items. Enter what you paid in total (tax and fees included) and each item's own price before tax; the extra is spread across the items and added to each unit cost. Everything starts ticked. Untick what wasn't on the receipt; type 0 for anything that was free.</div>"+
       "<div class='row2'><div class='field'><label>Who paid</label><select id='t_who'>"+ownerOptions(t.who)+"</select></div>"+
       "<div class='field'><label>Total paid at checkout ($)</label><input id='t_total' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.total)+"'></div></div>"+
       "<div class='field'><label>Spread tax &amp; fees</label><div class='seg-choice'>"+
         "<label><input type='radio' name='t_mode' value='prop'"+(t.mode!=="even"?" checked":"")+"> In proportion to price <small>(how sales tax works)</small></label>"+
         "<label><input type='radio' name='t_mode' value='even'"+(t.mode==="even"?" checked":"")+"> Evenly per unit</label></div></div>"+
+      "<div class='trip-listhead'><span>Items on this receipt</span><button type='button' class='linkbtn' data-action='trip-toggle-all'>Clear all</button></div>"+
       "<div class='trip-list'>"+rows+"</div>"+
       "<div class='trip-summary' id='tripSummary'></div>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='trip-review'>Review</button>", { wide:true });
     updateTripSummary();
   }
+  function flagTripMissing(keys){
+    document.querySelectorAll(".trip-row").forEach(function(row){
+      var miss = keys.indexOf(row.dataset.key) !== -1, w = row.querySelector(".trip-warn");
+      row.classList.toggle("missing", miss);
+      if (miss && !w){
+        row.insertAdjacentHTML("beforeend", "<div class='trip-warn'><span><i class='warn-dot'>!</i>Price missing</span>"+
+          "<button type='button' class='btn small' data-action='trip-zero'>It was $0</button>"+
+          "<button type='button' class='btn small ghost' data-action='trip-skip'>Skip item</button></div>");
+      } else if (!miss && w){ w.remove(); }
+    });
+    paintBlankBar();
+  }
+  function clearTripFlag(row){
+    if (!row) return;
+    row.classList.remove("missing");
+    var w = row.querySelector(".trip-warn"); if (w) w.remove();
+    paintBlankBar();
+  }
+  // "N without a price" bar above the list, with one-tap bulk answers
+  function paintBlankBar(){
+    var n = document.querySelectorAll(".trip-row.missing").length, bar = $("#tripBlankBar");
+    if (!n){ if (bar) bar.remove(); return; }
+    var html = "<span><i class='warn-dot'>!</i>"+n+" without a price</span>"+
+      "<button type='button' class='btn small' data-action='trip-zero-all'>All $0</button>"+
+      "<button type='button' class='btn small ghost' data-action='trip-skip-all'>Skip all</button>";
+    if (bar){ bar.innerHTML = html; return; }
+    var list = $("#modalRoot .trip-list");
+    if (list) list.insertAdjacentHTML("beforebegin", "<div id='tripBlankBar' class='trip-blankbar'>"+html+"</div>");
+  }
   function openTripConfirm(){
     var t = readTrip(); pendingTrip = t;
+    var blanks = [];
+    productGroupList().forEach(function(g){
+      var it = t.items[g.key];
+      if (it && it.checked && String(it.price==null?"":it.price).trim()==="") blanks.push(g.key);
+    });
+    if (blanks.length){
+      flagTripMissing(blanks);
+      var firstMiss = document.querySelector(".trip-row.missing");
+      if (firstMiss && firstMiss.scrollIntoView) firstMiss.scrollIntoView({ block:"center", behavior:"smooth" });
+      toast(blanks.length+" item"+(blanks.length>1?"s":"")+" still need a price. Enter it, tap \u201cIt was $0\u201d, or skip.");
+      return;
+    }
     var c = tripCalc(t);
     if (c.problem){ toast(c.problem); return; }
     var paidSum = round2(c.rows.reduce(function(a,r){ return a + r.final*r.qty; }, 0));
@@ -3362,12 +3414,12 @@
       var mine = state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who; });
       if (mine.length){
         mine.forEach(function(b){
-          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, note:b.note||"", needsReview:!!b.needsReview });
-          updateBatch(b.id, { unitCost:r.final, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
+          updateBatch(b.id, { unitCost:r.final, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
         });
       } else {
         var shipped = state.sales.some(function(x){ return r.g.pids.indexOf(x.productId)!==-1 && x.ebayShipped; });
-        Promise.resolve(addBatch({ productId:r.g.ps[0].id, owner:t.who, quantity:r.qty, unitCost:r.final, status: shipped?"received":"preorder",
+        Promise.resolve(addBatch({ productId:r.g.ps[0].id, owner:t.who, quantity:r.qty, unitCost:r.final, costKnown:true, status: shipped?"received":"preorder",
           receivedDate: shipped?today:null, expectedArrival:null, needsReview:false, note:"Store trip "+fmtDate(today) }))
           .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
       }
@@ -3380,7 +3432,7 @@
     if (!u){ toast("Nothing to undo"); return; }
     lastTripUndo = null;
     u.created.forEach(function(id){ if (id) deleteBatch(id); });
-    u.changed.forEach(function(x){ updateBatch(x.id, { unitCost:x.unitCost, note:x.note, needsReview:x.needsReview }); });
+    u.changed.forEach(function(x){ updateBatch(x.id, { unitCost:x.unitCost, costKnown:x.costKnown, note:x.note, needsReview:x.needsReview }); });
     toast("Undone — costs restored");
   }
 
@@ -3702,14 +3754,14 @@
     if(!b) return;
     var p = productById(b.productId);
     var sibs = siblingBatches(b);
-    var allUnknown = sibs.length && sibs.every(function(x){ return !Number(x.unitCost); });
+    var allUnknown = sibs.length && sibs.every(function(x){ return !Number(x.unitCost) && !x.costKnown; });
     var applyAll = sibs.length
       ? "<label class='check'><input type='checkbox' id='f_applyall'"+(allUnknown?" checked":"")+"> <span>Use this unit cost for the other "+sibs.length+" "+esc(b.owner)+" batch"+(sibs.length>1?"es":"")+" of this item too</span></label>"
       : "";
     openModal("Edit batch — "+(p?p.name:""),
       "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(b.owner)+"</select></div>"+
       "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='"+b.quantity+"'></div></div>"+
-      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' value='"+b.unitCost+"'></div>"+
+      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00' value='"+((b.unitCost||b.costKnown) ? b.unitCost : "")+"'></div>"+
       "<div class='field'><label>Status</label><select id='f_status'>"+statusOptions(b.status)+"</select></div></div>"+
       "<div class='field'><label>Expected arrival</label><input id='f_arrival' type='date' value='"+(b.expectedArrival||"")+"'></div>"+
       applyAll+
@@ -4337,6 +4389,22 @@
     if (action==="assign-all-owner"){ openOwnerConfirm(needsOwnerSales().map(function(x){ return x.id; }), t.dataset.who, false); return; }
     if (action==="open-trip"){ pendingTrip = null; openTripModal(); return; }
     if (action==="trip-review"){ openTripConfirm(); return; }
+    if (action==="trip-zero"){ var r1 = t.closest(".trip-row"); if (r1){ r1.querySelector(".trip-price").value = "0"; clearTripFlag(r1); updateTripSummary(); } return; }
+    if (action==="trip-skip"){ var r2 = t.closest(".trip-row"); if (r2){ r2.querySelector(".trip-chk").checked = false; clearTripFlag(r2); updateTripSummary(); } return; }
+    if (action==="trip-zero-all" || action==="trip-skip-all"){
+      document.querySelectorAll(".trip-row.missing").forEach(function(row){
+        if (action==="trip-zero-all") row.querySelector(".trip-price").value = "0"; else row.querySelector(".trip-chk").checked = false;
+        row.classList.remove("missing"); var w = row.querySelector(".trip-warn"); if (w) w.remove();
+      });
+      paintBlankBar(); updateTripSummary(); return;
+    }
+    if (action==="trip-toggle-all"){
+      var boxes = document.querySelectorAll(".trip-chk");
+      var allOn = Array.prototype.every.call(boxes, function(x){ return x.checked; });
+      boxes.forEach(function(x){ x.checked = !allOn; if (allOn) clearTripFlag(x.closest(".trip-row")); });
+      t.textContent = allOn ? "Select all" : "Clear all";
+      updateTripSummary(); return;
+    }
     if (action==="trip-back"){ openTripModal(); return; }
     if (action==="trip-apply"){ applyTrip(); closeModal(); return; }
     if (action==="undo-trip"){ undoTrip(); var tz = t.closest(".toast"); if (tz) tz.remove(); return; }
@@ -4386,7 +4454,7 @@
     if (action==="submit-add-batch"){
       addBatch({
         productId: $("#f_product").value, owner: $("#f_owner").value,
-        quantity: Number($("#f_qty").value)||1, unitCost: Number($("#f_cost").value)||0,
+        quantity: Number($("#f_qty").value)||1, unitCost: Number($("#f_cost").value)||0, costKnown: $("#f_cost").value!=="",
         status: $("#f_status").value, expectedArrival: $("#f_arrival").value || null,
         receivedDate: $("#f_status").value==="received" ? todayISO() : null,
         note: $("#f_note").value.trim(), needsReview:false
@@ -4404,19 +4472,19 @@
       var editedNote = $("#f_note").value.trim();
       if (editedNote === AUTO_BATCH_NOTE || editedNote === PURCHASE_NOTE) editedNote = "";
       var oldB = state.batches.find(function(x){ return x.id===id; });
-      var newCost = Number($("#f_cost").value)||0, newStatus = $("#f_status").value;
+      var costRaw = $("#f_cost").value, newCost = Number(costRaw)||0, newStatus = $("#f_status").value;
       updateBatch(id, {
         owner: $("#f_owner").value, quantity: Number($("#f_qty").value)||1,
-        unitCost: newCost, status: newStatus,
+        unitCost: newCost, costKnown: costRaw!=="", status: newStatus,
         expectedArrival: $("#f_arrival").value || null,
         receivedDate: newStatus==="received" ? ((oldB && oldB.status==="received" && oldB.receivedDate) || todayISO()) : null,
         note: editedNote, needsReview:false
       });
       var applyBox = $("#f_applyall"), nApplied = 0;
-      if (applyBox && applyBox.checked && newCost > 0 && oldB){
+      if (applyBox && applyBox.checked && costRaw!=="" && oldB){
         siblingBatches(oldB).forEach(function(x){
           nApplied++;
-          updateBatch(x.id, { unitCost:newCost, needsReview:false, note:(x.note===AUTO_BATCH_NOTE || x.note===PURCHASE_NOTE) ? "" : (x.note||"") });
+          updateBatch(x.id, { unitCost:newCost, costKnown:true, needsReview:false, note:(x.note===AUTO_BATCH_NOTE || x.note===PURCHASE_NOTE) ? "" : (x.note||"") });
         });
       }
       toast(nApplied ? "Cost applied to this batch and "+nApplied+" more" : "Batch updated");
@@ -4639,12 +4707,18 @@
     }
   });
   document.addEventListener("change", function(e){
-    if (e.target && e.target.closest && e.target.closest("#modalRoot .seg-choice, #modalRoot .trip-chk, #modalRoot #t_who")) updateTripSummary();
+    if (e.target && e.target.closest && e.target.closest("#modalRoot .seg-choice, #modalRoot .trip-chk, #modalRoot #t_who")){
+      if (e.target.classList.contains("trip-chk") && !e.target.checked) clearTripFlag(e.target.closest(".trip-row"));
+      updateTripSummary();
+    }
   });
   var searchTimer = null;
   document.addEventListener("input", function(e){
     var id = e.target && e.target.id;
-    if (e.target && e.target.closest && e.target.closest("#modalRoot .trip-list, #modalRoot #t_total, #modalRoot #t_who")){ updateTripSummary(); return; }
+    if (e.target && e.target.closest && e.target.closest("#modalRoot .trip-list, #modalRoot #t_total, #modalRoot #t_who")){
+      if (e.target.classList.contains("trip-price") && e.target.value !== "") clearTripFlag(e.target.closest(".trip-row"));
+      updateTripSummary(); return;
+    }
     if (id !== "salesSearch" && id !== "invSearch") return;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function(){
