@@ -675,6 +675,15 @@
     .modal-backdrop{ padding:12px; }
   }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
+  @media (max-width:780px){
+    .owner-queue{ padding:14px 12px; border-radius:20px; }
+    .owner-queue-row{ flex-wrap:wrap; gap:8px 10px; padding:10px 12px; }
+    .owner-queue-row .what{ flex:1 1 0; min-width:0; }
+    .owner-queue-row .what span{ white-space:normal; }
+    .owner-queue-row .who{ flex:1 1 100%; flex-wrap:wrap; gap:6px; }
+    .owner-queue-row .who .btn{ flex:1 1 auto; justify-content:center; }
+    .owner-queue-row .amt{ flex:0 0 auto; }
+  }
 </style>
 </head>
 <body data-tab="overview">
