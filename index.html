@@ -852,6 +852,15 @@
   .cost-list > div{ display:flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:600; color:var(--ink); line-height:1.3; }
   .cost-list .ic{ width:16px; height:16px; flex:0 0 auto; color:var(--accent); margin-top:1px; }
   .cost-list .ic svg{ width:16px; height:16px; }
+
+  .cost-badge.mini{ margin-left:0; }
+  .cost-strip{ display:flex; align-items:center; gap:12px; margin:0 16px 12px; padding:10px 12px; background:var(--accent-soft); border-radius:16px; }
+  .cost-strip > .ic{ width:22px; height:22px; flex:0 0 auto; color:var(--accent); display:inline-flex; }
+  .cost-strip > .ic svg{ width:22px; height:22px; }
+  .cost-strip .btn{ white-space:nowrap; flex:0 0 auto; }
+  .cs-text{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
+  .cs-text b{ font-size:13.5px; color:var(--ink); }
+  .cs-text small{ font-size:12px; color:var(--muted); line-height:1.3; }
 </style>
 </head>
 <body data-tab="overview">
@@ -3295,7 +3304,7 @@
     var cost = Number(b.quantity)*Number(b.unitCost);
     return "<div class='pre-card'>"+prodThumb(p, name)+
       "<div class='pre-main'><div class='pre-title'>"+esc(name)+"</div>"+
-        "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></div>"+
+        "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span>"+(costLogged(b) ? "" : costPill())+"</div>"+
         "<div class='sale-sub'>"+(costLogged(b) ? money(b.unitCost)+" each · "+money(cost)+" committed" : "cost not logged yet")+"</div></div>"+
       "<div class='pre-when'><div class='pre-date'>"+(b.expectedArrival?fmtDate(b.expectedArrival):"—")+"</div>"+whenPill(b.expectedArrival)+
         (compact ? "" : "<button class='btn small primary' data-action='mark-received' data-id='"+b.id+"'>Mark received</button>")+
@@ -3327,6 +3336,7 @@
     if (noBatch) units = groupStock(g.pids).sold;
     return { units:units, costed:costed, noBatch:noBatch, missing: noBatch ? units>0 : costed < units };
   }
+  function costPill(){ return "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Cost missing</span>"; }
   function costBadge(c){
     if (!c.missing) return "<span class='cost-badge ok'><span class='ic' data-icon='check'></span>Cost logged</span>";
     var txt = (c.noBatch || c.costed===0) ? "Cost missing" : "Cost missing · "+c.costed+" of "+c.units+" units";
@@ -3542,7 +3552,7 @@
       return html;
     }
     plist.forEach(function(grp){
-      var p = grp.p, pid = grp.ps[0].id;
+      var p = grp.p, pid = grp.ps[0].id, cst = groupCost(grp);
       var stock = { received:0, pipeline:0, sold:0, remaining:0 };
       grp.pids.forEach(function(id){ var st = stockFor(id); stock.received += st.received; stock.pipeline += st.pipeline; stock.sold += st.sold; stock.remaining += st.remaining; });
       var batches = state.batches.filter(function(b){ return grp.pids.indexOf(b.productId)!==-1; });
@@ -3551,7 +3561,12 @@
       var onHand = Math.max(0, stock.remaining), short = Math.max(0, -stock.remaining);
       html += "<div class='card product-card'>"+
         "<div class='product-head'><div class='product-title'>"+prodThumb(p, p.name, "lg")+
-          "<div class='pt-text'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span> "+costBadge(groupCost(grp))+"</div></div></div>"+
+          "<div class='pt-text'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span> "+(cst.missing ? "" : costBadge(cst))+"</div></div></div>"+
+        (cst.missing
+          ? "<div class='cost-strip'><span class='ic' data-icon='coin'></span><span class='cs-text'><b>No purchase cost logged</b><small>"+
+              ((cst.noBatch || cst.costed===0) ? "Add what you paid so profit can be tracked." : cst.costed+" of "+cst.units+" units have a cost.")+
+            "</small></span><button type='button' class='btn small primary' data-action='cost-one' data-key='"+esc(grp.key)+"'>Add cost</button></div>"
+          : "")+
         "<div class='stat-strip'>"+
           "<div class='stat good'><b>"+stock.received+"</b><span>Received</span></div>"+
           "<div class='stat'><b>"+stock.sold+"</b><span>Sold</span></div>"+
@@ -3658,7 +3673,7 @@
       "<div class='sale-main'>"+
         "<div class='sale-title'>"+esc(name)+"</div>"+
         "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
-        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+"</div>"+
+        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(saleProfit(s)==null ? costPill() : "")+"</div>"+
       "</div>"+
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
@@ -4464,6 +4479,12 @@
       if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
     if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
+    if (action==="cost-one"){
+      var items = {};
+      productGroupList().forEach(function(g){ items[g.key] = { checked: g.key===t.dataset.key }; });
+      pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: items };
+      openTripModal(); return;
+    }
     if (action==="inv-filter"){ invFilter = t.dataset.f; render(); return; }
     if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
