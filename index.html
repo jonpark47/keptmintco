@@ -861,6 +861,13 @@
   .cs-text{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:1px; }
   .cs-text b{ font-size:13.5px; color:var(--ink); }
   .cs-text small{ font-size:12px; color:var(--muted); line-height:1.3; }
+
+  .navbtn{ position:relative; }
+  .nav-dot{ position:absolute; min-width:18px; height:18px; padding:0 5px; box-sizing:border-box; border-radius:99px; background:var(--g-brand, var(--accent)); color:#fff; font-size:11px; font-weight:700; line-height:18px; text-align:center; font-variant-numeric:tabular-nums; box-shadow:0 0 0 2px var(--surface); }
+  .bottom-tabbar .nav-dot{ top:2px; left:calc(50% + 8px); }
+  .navtabs .nav-dot{ top:50%; right:12px; transform:translateY(-50%); }
+  .owner-queue-row .who .btn.primary{ background:var(--g-brand, var(--accent)); color:#fff; box-shadow:none; }
+  .oq-note{ flex:1 1 100%; font-size:13px; color:var(--muted); font-weight:500; }
 </style>
 </head>
 <body data-tab="overview">
@@ -896,6 +903,7 @@
     <div class="sync-row"><span id="syncPill" class="sync-pill" role="status"></span></div>
     <div id="reviewBanner"></div>
     <div id="ownerBanner"></div>
+    <div id="costBanner"></div>
     <div id="main"></div>
   </main>
 </div>
@@ -2855,6 +2863,7 @@
     $("#pageTitle").innerHTML = "<h1>"+titles[tab]+"</h1>";
     renderReviewBanner();
     renderOwnerBanner();
+    renderCostBanner();
     var main = $("#main");
     main.setAttribute("aria-busy", isLoading() ? "true" : "false");
     if (isLoading()) main.innerHTML = skeletonHtml();
@@ -3341,6 +3350,34 @@
     if (!c.missing) return "<span class='cost-badge ok'><span class='ic' data-icon='check'></span>Cost logged</span>";
     var txt = (c.noBatch || c.costed===0) ? "Cost missing" : "Cost missing · "+c.costed+" of "+c.units+" units";
     return "<span class='cost-badge'><span class='ic' data-icon='coin'></span>"+txt+"</span>";
+  }
+  function missingCostGroups(){
+    return productGroupList().map(function(g){ return { g:g, c:groupCost(g) }; }).filter(function(x){ return x.c.missing; });
+  }
+  // Top of the dashboard: the items whose purchase price still needs logging, plus a count
+  // badge on the Inventory tab so it is visible from any page.
+  function renderCostBanner(){
+    var box = $("#costBanner"); if (!box) return;
+    var miss = (isLoading() || !state.products.length) ? [] : missingCostGroups();
+    document.querySelectorAll(".navbtn[data-tab='inventory']").forEach(function(b){
+      var d = b.querySelector(".nav-dot");
+      if (miss.length){
+        if (!d){ d = document.createElement("span"); d.className = "nav-dot"; b.appendChild(d); }
+        d.textContent = miss.length; d.setAttribute("aria-label", miss.length+" items need a purchase cost");
+      } else if (d){ d.remove(); }
+    });
+    if (!miss.length || tab!=="overview"){ box.innerHTML = ""; return; }
+    var rows = miss.slice(0, 4).map(function(x){
+      var c = x.c;
+      return "<div class='owner-queue-row'>"+prodThumb(x.g.p, x.g.p.name)+"<div class='what'>"+esc(x.g.p.name)+
+        "<span>"+((c.noBatch || c.costed===0) ? "no purchase price yet" : c.costed+" of "+c.units+" units priced")+"</span></div>"+
+        "<div class='who'><button class='btn small primary' data-action='cost-one' data-key='"+esc(x.g.key)+"'>Add price</button></div></div>";
+    }).join("");
+    box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><span class='oq-badge'>Needs you</span><b>"+miss.length+" item"+(miss.length>1?"s":"")+" need"+(miss.length>1?"":"s")+" a purchase price</b><span class='oq-note'>Add what you paid so your profit can be tracked.</span></span>"+
+      "<span><button class='btn small primary' data-action='cost-all'>Add all "+miss.length+"</button></span></div>"+
+      "<div class='owner-queue-list'>"+rows+"</div>"+
+      (miss.length>4 ? "<button type='button' class='linkbtn' data-action='goto-costs'>See all "+miss.length+" in Inventory</button>" : "")+"</div>";
+    paintIcons(box);
   }
   function costCardHtml(){
     var gs = productGroupList().map(function(g){ return { g:g, c:groupCost(g) }; });
@@ -4479,6 +4516,12 @@
       if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
     if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
+    if (action==="cost-all"){
+      var allItems = {}, missKeys = missingCostGroups().map(function(x){ return x.g.key; });
+      productGroupList().forEach(function(g){ allItems[g.key] = { checked: missKeys.indexOf(g.key)!==-1 }; });
+      pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: allItems };
+      openTripModal(); return;
+    }
     if (action==="cost-one"){
       var items = {};
       productGroupList().forEach(function(g){ items[g.key] = { checked: g.key===t.dataset.key }; });
