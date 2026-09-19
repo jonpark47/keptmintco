@@ -19,7 +19,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500..800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root{
     --bg:#f4f1ff;
@@ -135,7 +135,7 @@
   .owner-queue{ background:var(--warn-soft); border-radius:var(--radius); padding:12px 14px; margin-bottom:14px; }
   .owner-queue-head{ display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; justify-content:space-between; margin-bottom:8px; font-size:14px; }
   .owner-queue-head b{ font-weight:650; }
-  .owner-queue-list{ display:flex; flex-direction:column; gap:6px; max-height:260px; overflow-y:auto; }
+  .owner-queue-list{ display:flex; flex-direction:column; gap:6px; max-height:400px; overflow-y:auto; }
   .owner-queue-row{ display:flex; align-items:center; gap:10px; background:var(--surface); border-radius:10px; padding:8px 10px; }
   .owner-queue-row .amt{ flex:0 0 4.6rem; font-size:16px; font-weight:650; font-variant-numeric:tabular-nums; }
   .owner-queue-row .what{ flex:1 1 auto; min-width:0; font-size:13.5px; }
@@ -550,7 +550,7 @@
     .bottom-tabbar .navbtn .ic{ width:34px; height:28px; border-radius:11px; }
     .bottom-tabbar .navbtn.active{ background:transparent; box-shadow:none; }
     .bottom-tabbar .navbtn.active .ic{ box-shadow:0 8px 16px -6px var(--tabc); }
-    .tiles.mini{ grid-template-columns:repeat(3,1fr); gap:8px; }
+    .tiles.mini{ grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:8px; }
     .tiles.mini .tile{ padding:12px 12px 14px; border-radius:18px; }
     .tiles.mini .tile .eyebrow{ font-size:9.5px; letter-spacing:.06em; }
     .tiles.mini .tile .value{ font-size:19px; }
@@ -564,6 +564,117 @@
   @media (prefers-reduced-motion: reduce){
     .tile, .tile:hover, .sale-row, .sale-row:hover, .btn, .btn:hover, .navbtn, .navbtn:hover{ transition:none; transform:none; }
   }
+
+  /* ================= v2: one typeface, card-only layouts, nothing scrolls sideways ================= */
+  :root{
+    --font:"Poppins",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    --display:var(--font);
+    --radius:20px;
+  }
+  html{ overflow-x:clip; }
+  body{ font-family:var(--font); font-size:14px; line-height:1.5; overflow-x:hidden; letter-spacing:0; }
+  button,input,select,textarea{ font-family:inherit; }
+  h1,h2,h3{ font-family:var(--font); }
+  .num,.tabular,.tile .value,.sale-profit,.stat b,.pay-amt,.owner-queue-row .amt{ font-variant-numeric:tabular-nums; }
+  .shell,.main,#main,.sale-main,.pre-main,.batch-main,.pt-text,.pay-main,.ib-text{ min-width:0; }
+  .main{ max-width:100%; }
+  img{ max-width:100%; }
+  .sale-title,.pre-title,.product-title h3,.batch-note,.sale-sub{ overflow-wrap:anywhere; }
+
+  .brand{ font-weight:700; font-size:19px; letter-spacing:-.01em; }
+  .topbar h1{ font-size:32px; font-weight:700; letter-spacing:-.02em; }
+  .section-head h2{ font-size:20px; font-weight:700; letter-spacing:-.01em; }
+  .tile .value{ font-size:34px; font-weight:700; letter-spacing:-.02em; }
+  .tile .eyebrow{ font-weight:600; }
+  .tiles.mini .tile .value{ font-size:25px; }
+  .navbtn{ font-weight:500; } .navbtn.active{ font-weight:600; }
+  .btn{ font-weight:600; } .badge{ font-weight:600; font-size:11.5px; }
+  .chip{ font-weight:700; font-size:15px; letter-spacing:0; }
+  .sale-profit{ font-weight:700; font-size:22px; letter-spacing:-.01em; }
+  .sale-title,.pre-title{ font-weight:600; font-size:14.5px; }
+  .modal-head h3{ font-weight:700; }
+
+  /* listing photo, with the initials chip underneath as the fallback */
+  .thumb{ position:relative; flex:0 0 auto; width:56px; height:56px; border-radius:16px; overflow:hidden; background:var(--surface-2); box-shadow:0 8px 18px -10px rgba(40,20,120,.5); }
+  .thumb.lg{ width:68px; height:68px; border-radius:20px; }
+  .thumb .chip{ position:absolute; inset:0; width:100%; height:100%; border-radius:0; box-shadow:none; }
+  .thumb img{ position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#fff; }
+
+  /* preorder + arrival cards (replace the old tables) */
+  .pre-list{ display:flex; flex-direction:column; gap:10px; }
+  .pre-card{ display:flex; align-items:center; gap:14px; padding:14px 16px; background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); transition:transform .15s, border-color .15s; }
+  .pre-card:hover{ transform:translateY(-2px); border-color:color-mix(in srgb,var(--tabc) 45%, var(--border)); }
+  .pre-main{ flex:1 1 auto; }
+  .pre-title{ line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .pre-when{ flex:0 0 auto; display:flex; flex-direction:column; align-items:flex-end; gap:6px; text-align:right; }
+  .pre-date{ font-weight:600; font-size:13px; }
+  .when{ display:inline-block; font-size:11.5px; font-weight:700; padding:3px 11px; border-radius:99px; white-space:nowrap; }
+  .when.later{ background:var(--accent-soft); color:var(--accent); }
+  .when.soon{ background:var(--warn-soft); color:var(--warn); }
+  .when.late{ background:var(--bad-soft); color:var(--bad); }
+  .when.none{ background:var(--surface-2); color:var(--muted); }
+  .badge.qty{ background:var(--surface-2); color:var(--ink); }
+
+  /* inventory */
+  .product-head{ padding:18px 20px 14px; }
+  .product-title{ gap:14px; align-items:center; }
+  .pt-text{ display:flex; flex-direction:column; align-items:flex-start; gap:6px; }
+  .product-title h3{ font-size:16px; font-weight:600; line-height:1.3; }
+  .stat-strip{ display:grid; grid-template-columns:repeat(4,1fr); gap:10px; padding:0 20px 14px; }
+  .stat{ background:var(--surface-2); border-radius:16px; padding:10px 14px; }
+  .stat b{ display:block; font-size:20px; font-weight:700; line-height:1.25; }
+  .stat span{ font-size:10.5px; color:var(--muted); font-weight:600; text-transform:uppercase; letter-spacing:.07em; }
+  .stat.good b{ color:var(--good); } .stat.warn b{ color:var(--warn); }
+  .short-note{ margin:0 20px 14px; padding:9px 14px; border-radius:12px; background:var(--warn-soft); color:var(--warn); font-size:12.5px; font-weight:600; }
+  .batch-list{ display:flex; flex-direction:column; gap:8px; padding:0 16px 14px; }
+  .batch-row{ display:flex; align-items:center; justify-content:space-between; gap:10px 14px; flex-wrap:wrap; padding:12px 14px; background:var(--surface-2); border-radius:16px; }
+  .batch-main{ flex:1 1 220px; }
+  .batch-note{ font-size:12px; color:var(--muted); margin-top:4px; font-style:italic; }
+  .batch-actions{ display:flex; gap:4px; flex-wrap:wrap; }
+  .card-actions{ padding:12px 16px 16px; border-top:1px solid var(--border); flex-wrap:wrap; }
+
+  /* settlements */
+  .pay-list{ display:flex; flex-direction:column; gap:10px; }
+  .pay-row{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; padding:14px 16px; background:var(--surface); border:1px solid var(--border); border-radius:20px; box-shadow:var(--shadow); }
+  .pay-flow{ display:flex; align-items:center; gap:8px; flex:0 0 auto; }
+  .pay-arrow{ color:var(--muted); font-weight:700; }
+  .pay-main{ flex:1 1 140px; }
+  .pay-amt{ font-weight:700; font-size:20px; }
+
+  /* sales */
+  .sales-list{ display:flex; flex-direction:column; gap:10px; }
+  .sale-row{ gap:14px; }
+  .sale-sub{ font-size:12px; }
+  .import-bar .lead{ font-weight:600; font-size:14px; }
+  .import-bar{ border-radius:22px; }
+
+  .modal-backdrop{ overflow-y:auto; }
+  .modal{ max-width:min(440px,100%); }
+
+  @media (max-width:780px){
+    .main{ padding:18px 14px 96px; }
+    .topbar h1{ font-size:27px; }
+    .tile .value{ font-size:29px; }
+    .stat-strip{ grid-template-columns:repeat(4,1fr); gap:6px; padding:0 14px 12px; }
+    .stat{ padding:8px 6px; text-align:center; border-radius:14px; }
+    .stat b{ font-size:17px; }
+    .stat span{ font-size:9px; letter-spacing:.03em; }
+    .product-head{ padding:16px 14px 12px; }
+    .short-note{ margin:0 14px 14px; }
+    .batch-list{ padding:0 10px 12px; }
+    .card-actions{ padding:12px 14px 14px; }
+    .thumb{ width:52px; height:52px; border-radius:15px; }
+    .thumb.lg{ width:60px; height:60px; border-radius:18px; }
+    .pre-card{ flex-wrap:wrap; }
+    .pre-main{ flex:1 1 0; }
+    .pre-when{ flex:1 1 100%; flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; text-align:left; padding-top:10px; border-top:1px dashed var(--border); }
+    .pay-row{ padding:12px 14px; }
+    .import-bar{ flex-wrap:wrap; }
+    .import-bar .go{ margin-left:0; width:100%; justify-content:center; }
+    .sale-actions{ justify-content:flex-start; border-top:1px dashed var(--border); padding-top:8px; }
+    .modal-backdrop{ padding:12px; }
+  }
+  @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
 </style>
 </head>
 <body data-tab="overview">
@@ -2533,23 +2644,142 @@
       "<button data-action='goto-inventory'>Review in Inventory</button></div>";
   }
 
-  // eBay-synced sales the server couldn't attribute on its own (no purchase history for that
-  // item, so it won't guess who gets the profit) sit here until someone taps Jon or Jax.
-  function needsOwnerSales(){ return state.sales.filter(function(s){ return !s.attributedTo; }); }
+  // ---- who bought it / who gets each sale ----
+  // Purchases (batches) are the source of truth for who owns stock. Sales of an item nobody has
+  // logged buying can't be attributed honestly, so the app asks: Jon, Jax, or both (and how many
+  // each, including units not sold yet). The split rule below mirrors ebay_sync.py: highest
+  // profit per unit goes to Jon until his units are covered, the rest to Jax; sales still in
+  // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
+  var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
+  function groupKeyForSale(s){
+    var p = productById(s.productId);
+    return String((p && p.name) || s.productId || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+  }
+  function realUnitsFor(pids){
+    var u = { Jon:0, Jax:0 };
+    state.batches.forEach(function(b){
+      if (pids.indexOf(b.productId)===-1 || (b.owner!=="Jon" && b.owner!=="Jax")) return;
+      if (b.note===AUTO_BATCH_NOTE && !Number(b.unitCost)) return; // a sale's own placeholder, not a purchase
+      u[b.owner] += Number(b.quantity||0);
+    });
+    return u;
+  }
+  function purchaseGroups(){
+    var groups = {};
+    state.sales.forEach(function(s){ var k = groupKeyForSale(s); (groups[k] = groups[k] || []).push(s); });
+    var out = [];
+    Object.keys(groups).forEach(function(k){
+      var g = groups[k], pids = [];
+      g.forEach(function(s){ if (pids.indexOf(s.productId)===-1) pids.push(s.productId); });
+      var u = realUnitsFor(pids);
+      if (u.Jon>0 || u.Jax>0) return;                                  // purchases already recorded
+      var qty = g.reduce(function(a,s){ return a + Number(s.quantitySold||1); }, 0);
+      if (qty < 2) return;                                             // one unit: the plain owner prompt covers it
+      if (!g.some(function(s){ return !s.attributedTo; })) return;     // everything already has an owner
+      out.push({ key:k, sales:g, pids:pids, qty:qty });
+    });
+    return out;
+  }
+  function needsOwnerSales(){
+    var inGroup = {};
+    purchaseGroups().forEach(function(g){ g.sales.forEach(function(s){ inGroup[s.id] = true; }); });
+    return state.sales.filter(function(s){ return !s.attributedTo && !inGroup[s.id]; });
+  }
+  function allocateSales(sales, units){
+    var left = { Jon:units.Jon, Jax:units.Jax }, res = {};
+    function isAuto(s){ return s.ownerSource==="auto" && s.lifecycleStatus!=="completed"; }
+    sales.forEach(function(s){ if (!isAuto(s) && left[s.attributedTo]!==undefined) left[s.attributedTo] -= Number(s.quantitySold||0); });
+    var perUnit = function(s){ return Number(s.netProfit||0) / Math.max(Number(s.quantitySold||1), 1); };
+    sales.filter(isAuto).sort(function(a,b){ return perUnit(b)-perUnit(a); }).forEach(function(s){
+      var q = Number(s.quantitySold||1), owner = null;
+      if (units.Jax===0) owner = "Jon";
+      else if (units.Jon===0) owner = "Jax";
+      else if (left.Jon >= q) owner = "Jon";
+      else if (left.Jax >= q) owner = "Jax";
+      if (owner) left[owner] -= q;
+      res[s.id] = owner;
+    });
+    return res;
+  }
+  function applyPurchase(key, counts){
+    var g = purchaseGroups().filter(function(x){ return x.key===key; })[0];
+    if (!g) return;
+    counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
+    if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
+    // the $0 "covers a sale" placeholders are replaced by the real purchase below
+    state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && b.note===AUTO_BATCH_NOTE && !Number(b.unitCost); })
+      .forEach(function(b){ deleteBatch(b.id); });
+    var alloc = allocateSales(g.sales, counts);
+    var ownerOf = {};
+    g.sales.forEach(function(s){ ownerOf[s.id] = (s.id in alloc) ? alloc[s.id] : s.attributedTo; });
+    g.sales.forEach(function(s){
+      if (!(s.id in alloc)) return;
+      updateSale(s.id, { attributedTo: alloc[s.id], needsOwner: alloc[s.id]===null, ownerSource:"auto" });
+    });
+    // batches per owner per listing, sized to the sales that owner ends up with; anything bought
+    // beyond what has sold so far sits on hand under the listing with the most sales
+    var primary = g.pids.slice().sort(function(a,b){
+      var n = function(pid){ return g.sales.filter(function(s){ return s.productId===pid; }).length; };
+      return n(b)-n(a);
+    })[0];
+    ["Jon","Jax"].forEach(function(o){
+      var used = 0;
+      g.pids.forEach(function(pid){
+        var mine = g.sales.filter(function(s){ return s.productId===pid && ownerOf[s.id]===o; });
+        var q = mine.reduce(function(a,s){ return a + Number(s.quantitySold||1); }, 0);
+        if (!q) return;
+        used += q;
+        var allShipped = mine.every(function(s){ return s.ebayShipped || s.lifecycleStatus==="completed"; });
+        addBatch({ productId:pid, owner:o, quantity:q, unitCost:0, status: allShipped?"received":"preorder",
+                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:true, note:PURCHASE_NOTE });
+      });
+      var extra = counts[o] - used;
+      if (extra > 0) addBatch({ productId:primary, owner:o, quantity:extra, unitCost:0, status:"received",
+                                receivedDate:todayISO(), expectedArrival:null, needsReview:true, note:PURCHASE_NOTE });
+    });
+    toast("Saved — sales are split by who bought what");
+  }
+  function openBoughtModal(key){
+    var g = purchaseGroups().filter(function(x){ return x.key===key; })[0];
+    if (!g) return;
+    var p = productById(g.sales[0].productId);
+    openModal("Who bought this?",
+      "<div class='sale-sub' style='margin-bottom:12px'>"+esc(p?p.name:"This item")+" — "+g.qty+" sold so far.</div>"+
+      "<div class='row2'><div class='field'><label>Jon bought</label><input id='f_bj' type='number' min='0' step='1' value='"+g.qty+"'></div>"+
+      "<div class='field'><label>Jax bought</label><input id='f_bx' type='number' min='0' step='1' value='0'></div></div>"+
+      "<div class='hint'>Total each of you bought, including any you haven't sold yet. As more orders come in, the highest-profit ones go to Jon until his units are covered.</div>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-bought' data-key='"+esc(key)+"'>Save</button>");
+  }
   function renderOwnerBanner(){
     var box = $("#ownerBanner");
-    var list = needsOwnerSales();
-    if (!list.length){ box.innerHTML = ""; return; }
-    var rows = list.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
-      var p = productById(s.productId);
-      return "<div class='owner-queue-row'><div class='amt'>"+money(s.netProfit)+"</div><div class='what'>"+esc(p?p.name:"—")+"<span>"+esc(s.buyerName||"")+" · "+fmtDate(s.saleDate)+"</span></div>"+
-        "<div class='who'><button class='btn small' data-action='assign-owner' data-who='Jon' data-id='"+s.id+"'>Jon</button>"+
-        "<button class='btn small' data-action='assign-owner' data-who='Jax' data-id='"+s.id+"'>Jax</button></div></div>";
-    }).join("");
-    box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — highest profit first</span>"+
-      "<span><button class='btn small ghost' data-action='assign-all-owner' data-who='Jon'>All to Jon</button> <button class='btn small ghost' data-action='assign-all-owner' data-who='Jax'>All to Jax</button></span></div>"+
-      "<div class='owner-queue-list'>"+rows+"</div></div>";
+    var groups = purchaseGroups(), list = needsOwnerSales();
+    if ((!groups.length && !list.length) || (tab!=="overview" && tab!=="sales")){ box.innerHTML = ""; return; }
+    var html = "";
+    if (groups.length){
+      html += "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+groups.length+" item"+(groups.length>1?"s":"")+" sold more than once</b> — who bought "+(groups.length>1?"them":"it")+"?</span></div><div class='owner-queue-list'>"+
+        groups.map(function(g){
+          var p = productById(g.sales[0].productId), total = g.sales.reduce(function(a,s){ return a+Number(s.netProfit||0); }, 0);
+          return "<div class='owner-queue-row'>"+prodThumb(p, p&&p.name)+"<div class='what'>"+esc(p?p.name:"Item")+"<span>"+g.qty+" sold · "+money(total)+" profit so far</span></div>"+
+            "<div class='who'><button class='btn small' data-action='bought-all' data-key='"+esc(g.key)+"' data-who='Jon'>Jon bought all</button>"+
+            "<button class='btn small' data-action='bought-all' data-key='"+esc(g.key)+"' data-who='Jax'>Jax bought all</button>"+
+            "<button class='btn small ghost' data-action='bought-split' data-key='"+esc(g.key)+"'>Both…</button></div></div>";
+        }).join("")+"</div></div>";
+    }
+    if (list.length){
+      var rows = list.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
+        var p = productById(s.productId);
+        return "<div class='owner-queue-row'><div class='amt'>"+money(s.netProfit)+"</div><div class='what'>"+esc(p?p.name:"—")+"<span>"+esc(s.buyerName||"")+" · "+fmtDate(s.saleDate)+"</span></div>"+
+          "<div class='who'><button class='btn small' data-action='assign-owner' data-who='Jon' data-id='"+s.id+"'>Jon</button>"+
+          "<button class='btn small' data-action='assign-owner' data-who='Jax' data-id='"+s.id+"'>Jax</button></div></div>";
+      }).join("");
+      html += "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — highest profit first</span>"+
+        "<span><button class='btn small ghost' data-action='assign-all-owner' data-who='Jon'>All to Jon</button> <button class='btn small ghost' data-action='assign-all-owner' data-who='Jax'>All to Jax</button></span></div>"+
+        "<div class='owner-queue-list'>"+rows+"</div></div>";
+    }
+    box.innerHTML = html;
+    paintIcons();
   }
+
   function assignOwner(saleId, who){
     var s = state.sales.find(function(x){ return x.id===saleId; });
     if (!s) return Promise.resolve();
@@ -2576,110 +2806,126 @@
   function renderOverview(){
     var other = whoAmI === "Jon" ? "Jax" : "Jon";
     var myTied = cashTiedUp(whoAmI), otherTied = cashTiedUp(other);
-    var upcoming = preorderBatches().slice().sort(function(a,b){
-      if(!a.expectedArrival) return 1; if(!b.expectedArrival) return -1;
-      return a.expectedArrival < b.expectedArrival ? -1 : 1;
-    }).slice(0,5);
-
-    var html = "";
-    html += "<div class='tiles'>";
     var pending = pendingProfit();
-    html += "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>";
-    html += "<div class='tile t-"+(whoAmI==="Jon"?"jon":"jax")+"'><div class='eyebrow'>Your preorders</div><div class='value'>"+money(myTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
-    html += "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>";
-    html += "</div>";
+    var html = "<div class='tiles'>"+
+      "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(totalNetProfit())+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged"+(pending>0.004?" · "+money(pending)+" pending payout":"")+"</div></div>"+
+      "<div class='tile t-"+(whoAmI==="Jon"?"jon":"jax")+"'><div class='eyebrow'>Your preorders</div><div class='value'>"+money(myTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
+      "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
+      "</div>";
 
-    html += "<div class='section-head'><h2>Upcoming arrivals</h2><span class='count'>"+preorderBatches().length+" item(s) in the pipeline</span></div>";
+    var latest = state.sales.slice().sort(bySaleNewest).slice(0,4);
+    html += "<div class='section-head'><h2>Latest sales</h2><button class='btn ghost' data-action='goto-sales'>See all</button></div>";
+    html += latest.length
+      ? "<div class='sales-list'>"+latest.map(saleRow).join("")+"</div>"
+      : "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>";
+
+    var upcoming = preorderBatches().slice().sort(byArrival);
+    html += "<div class='section-head'><h2>Arriving soon</h2>"+(upcoming.length>4?"<button class='btn ghost' data-action='goto-preorders'>See all "+upcoming.length+"</button>":"<span class='count'>"+upcoming.length+" on the way</span>")+"</div>";
     if (!upcoming.length){
       html += state.batches.length
         ? "<div class='card empty'><div class='ic' data-icon='check'></div>Everything you've ordered has arrived.</div>"
-        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder). An eBay order you've scanned that happens to be a preorder listing is a different thing (that's a sale, tracked in Sales/Orders) and won't show up here.</div>";
+        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder).</div>";
     } else {
-      html += "<div class='card table-wrap'><table><thead><tr><th>Item</th><th>Owner</th><th>Qty</th><th>Expected</th><th>Status</th></tr></thead><tbody>";
-      upcoming.forEach(function(b){
-        var p = productById(b.productId);
-        var du = daysUntil(b.expectedArrival);
-        var when = b.expectedArrival ? fmtDate(b.expectedArrival) + (du!=null ? (du<0 ? " <span class='badge overdue'>"+Math.abs(du)+"d overdue</span>" : " <span class='hint'>("+du+"d)</span>") : "") : "—";
-        html += "<tr><td data-label='Item'>"+esc(p?p.name:"—")+"</td><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td><td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td data-label='Expected'>"+when+"</td><td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td></tr>";
-      });
-      html += "</tbody></table></div>";
+      html += "<div class='pre-list'>"+upcoming.slice(0,4).map(function(b){ return preorderCard(b, true); }).join("")+"</div>";
     }
     return html;
   }
 
+  function ownerPill(o){
+    return (o==="Jon"||o==="Jax") ? "<span class='badge owner-"+o+"'>"+o+"</span>" : "<span class='badge owner-none'>"+esc(o||"No owner")+"</span>";
+  }
+  function byArrival(a,b){
+    if (!a.expectedArrival) return 1; if (!b.expectedArrival) return -1;
+    return a.expectedArrival < b.expectedArrival ? -1 : 1;
+  }
+  function whenPill(dateStr){
+    if (!dateStr) return "<span class='when none'>No date set</span>";
+    var du = daysUntil(dateStr);
+    if (du==null) return "<span class='when none'>No date set</span>";
+    var cls = du<0 ? "late" : (du<=7 ? "soon" : "later");
+    var txt = du<0 ? Math.abs(du)+"d late" : du===0 ? "Today" : du===1 ? "Tomorrow" : "in "+du+" days";
+    return "<span class='when "+cls+"'>"+txt+"</span>";
+  }
+  function preorderCard(b, compact){
+    var p = productById(b.productId), name = p ? p.name : "Unknown item";
+    var cost = Number(b.quantity)*Number(b.unitCost);
+    return "<div class='pre-card'>"+prodThumb(p, name)+
+      "<div class='pre-main'><div class='pre-title'>"+esc(name)+"</div>"+
+        "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></div>"+
+        "<div class='sale-sub'>"+money(b.unitCost)+" each · "+money(cost)+" committed</div></div>"+
+      "<div class='pre-when'><div class='pre-date'>"+(b.expectedArrival?fmtDate(b.expectedArrival):"—")+"</div>"+whenPill(b.expectedArrival)+
+        (compact ? "" : "<button class='btn small primary' data-action='mark-received' data-id='"+b.id+"'>Mark received</button>")+
+      "</div></div>";
+  }
+
   function renderInventory(){
-    // No manual "Add item" here on purpose: a hand-typed product name (e.g. "Ascended Heroes
-    // Tin Pack") almost never matches the real, SEO-stuffed eBay listing title that later gets
-    // OCR'd off an order screenshot ("Pokemon Ascended Heroes Mega Evolutions Tin Pack 4 Packs
-    // Included") closely enough for matchProduct()'s fuzzy word-overlap check to link them —
-    // which used to silently create a duplicate product instead of matching the existing one.
-    // Scanning an order is now the ONLY way a product gets created, so every product's name is
-    // always the real listing title, and later scans of the same listing keep matching cleanly.
-    var html = "<div class='section-head'><h2>Products</h2></div>";
+    // No manual "Add item" here on purpose: a hand-typed product name almost never matches the
+    // real, SEO-stuffed eBay listing title closely enough to link to it, which used to silently
+    // create a duplicate product. Products now come from real orders, so every name is the real
+    // listing title and later orders for the same listing keep matching cleanly.
+    var html = "<div class='section-head'><h2>Products</h2><span class='count'>"+state.products.length+" item"+(state.products.length===1?"":"s")+"</span></div>";
     if (!state.products.length){
       html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — orders sync in from eBay on their own and this fills in automatically.</div>";
       return html;
     }
-    state.products.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).forEach(function(p){
+    state.products.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); }).forEach(function(p){
       var stock = stockFor(p.id);
       var batches = state.batches.filter(function(b){ return b.productId===p.id; });
-      html += "<div class='card product-card'>";
-      html += "<div class='product-head'>";
-      html += "<div class='product-title'>"+productChip(p.name)+"<h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span></div>";
-      html += "<div class='stock-line'><span>Received <b>"+stock.received+"</b></span><span>Sold <b>"+stock.sold+"</b></span><span>On hand <b>"+stock.remaining+"</b></span><span>Incoming <b>"+stock.pipeline+"</b></span></div>";
-      html += "</div>";
+      var onHand = Math.max(0, stock.remaining), short = Math.max(0, -stock.remaining);
+      html += "<div class='card product-card'>"+
+        "<div class='product-head'><div class='product-title'>"+prodThumb(p, p.name, "lg")+
+          "<div class='pt-text'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span></div></div></div>"+
+        "<div class='stat-strip'>"+
+          "<div class='stat good'><b>"+stock.received+"</b><span>Received</span></div>"+
+          "<div class='stat'><b>"+stock.sold+"</b><span>Sold</span></div>"+
+          "<div class='stat'><b>"+onHand+"</b><span>On hand</span></div>"+
+          "<div class='stat warn'><b>"+stock.pipeline+"</b><span>Incoming</span></div>"+
+        "</div>";
+      if (short) html += "<div class='short-note'>Sold "+short+" more than has been received — waiting on stock.</div>";
       if (batches.length){
-        html += "<div class='table-wrap'><table><thead><tr><th>Owner</th><th>Qty</th><th>Unit cost</th><th>Total</th><th>Status</th><th>Expected / Received</th><th>Note</th><th></th></tr></thead><tbody>";
+        html += "<div class='batch-list'>";
         batches.forEach(function(b){
           var du = daysUntil(b.expectedArrival);
-          var dateCell = b.status==="received" ? fmtDate(b.receivedDate) : (b.expectedArrival ? fmtDate(b.expectedArrival)+(du!=null&&du<0?" <span class='badge overdue'>late</span>":"") : "—");
-          html += "<tr><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td>"+
-            "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+(b.needsReview?"<div class='stack-cell'>"+money(b.unitCost)+"<span class='badge review'>Cost unknown</span></div>":money(b.unitCost))+"</td><td class='num-cell' data-label='Total'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
-            "<td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td data-label='Expected / Received'>"+dateCell+"</td>"+
-            "<td class='cell-note' data-label='Note' title='"+esc(b.note||"")+"'>"+esc(b.note||"")+"</td>"+
-            "<td data-label='Actions'><div class='row-actions'>"+
-              (b.status!=="received" ? "<button class='btn small' data-action='mark-received' data-id='"+b.id+"'>Received</button>" : "") +
+          var when = b.status==="received"
+            ? "Received "+fmtDate(b.receivedDate)
+            : (b.expectedArrival ? "Expected "+fmtDate(b.expectedArrival) : "No date set");
+          var ph = b.needsReview || (b.note===AUTO_BATCH_NOTE && !Number(b.unitCost));
+          html += "<div class='batch-row'>"+
+            "<div class='batch-main'>"+
+              "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span>"+
+                (ph ? "<span class='badge review'>Cost unknown</span>" : "")+
+                (b.status!=="received" && du!=null && du<0 ? "<span class='badge overdue'>late</span>" : "")+"</div>"+
+              "<div class='sale-sub'>"+(ph ? "add the real cost when you know it" : money(b.unitCost)+" each · "+money(Number(b.quantity)*Number(b.unitCost))+" total")+" · "+when+"</div>"+
+              (b.note && b.note!==AUTO_BATCH_NOTE && b.note!==PURCHASE_NOTE ? "<div class='batch-note'>"+esc(b.note)+"</div>" : "")+
+            "</div>"+
+            "<div class='batch-actions'>"+
+              (b.status!=="received" ? "<button class='btn small primary' data-action='mark-received' data-id='"+b.id+"'>Received</button>" : "")+
               "<button class='btn small ghost' data-action='edit-batch' data-id='"+b.id+"'>Edit</button>"+
               "<button class='btn small ghost danger' data-action='delete-batch' data-id='"+b.id+"'>Remove</button>"+
-            "</div></td></tr>";
+            "</div></div>";
         });
-        html += "</tbody></table></div>";
+        html += "</div>";
       }
       html += "<div class='card-actions'>"+
         "<button class='btn small' data-action='open-add-batch' data-product='"+p.id+"'><span class='ic' data-icon='plus'></span> Add batch</button>"+
         "<button class='btn small' data-action='open-add-sale' data-product='"+p.id+"'><span class='ic' data-icon='plus'></span> Record sale</button>"+
-        "</div>";
-      html += "</div>";
+        "</div></div>";
     });
     return html;
   }
 
   function renderPreorders(){
-    var rows = preorderBatches().slice().sort(function(a,b){
-      if(!a.expectedArrival) return 1; if(!b.expectedArrival) return -1;
-      return a.expectedArrival < b.expectedArrival ? -1 : 1;
-    });
-    var html = "<div class='section-head'><h2>Preorder pipeline</h2><span class='count'>"+rows.length+" item(s) not yet in hand</span></div>";
+    var rows = preorderBatches().slice().sort(byArrival);
+    var html = "<div class='section-head'><h2>Preorder pipeline</h2><span class='count'>"+rows.length+" item"+(rows.length===1?"":"s")+" not yet in hand</span></div>";
     if (!rows.length){
       html += state.batches.length
         ? "<div class='card empty'><div class='ic' data-icon='check'></div>Everything on order has arrived.</div>"
-        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder). Scanning an eBay order here that happens to be a preorder listing is a different thing (that's a sale, tracked in Sales/Orders) and won't show up in this pipeline.</div>";
+        : "<div class='card empty'><div class='ic' data-icon='preorders'></div>This tracks stock <b>you or Jax have paid to buy</b> and are waiting to receive — add one from Inventory (\"Add batch\", status Preorder).</div>";
       return html;
     }
-    html += "<div class='card table-wrap'><table><thead><tr><th>Item</th><th>Owner</th><th>Qty</th><th>Unit cost</th><th>Committed</th><th>Status</th><th>Expected</th><th></th></tr></thead><tbody>";
-    rows.forEach(function(b){
-      var p = productById(b.productId);
-      var du = daysUntil(b.expectedArrival);
-      var when = b.expectedArrival ? fmtDate(b.expectedArrival) : "—";
-      if (du!=null && du<0) when += " <span class='badge overdue'>"+Math.abs(du)+"d overdue</span>";
-      else if (du!=null) when += " <span class='hint'>("+du+"d)</span>";
-      html += "<tr><td data-label='Item'>"+esc(p?p.name:"—")+"</td><td data-label='Owner'><span class='badge owner-"+b.owner+"'>"+b.owner+"</span></td>"+
-        "<td class='num-cell' data-label='Qty'>"+b.quantity+"</td><td class='num-cell' data-label='Unit cost'>"+money(b.unitCost)+"</td><td class='num-cell' data-label='Committed'>"+money(Number(b.quantity)*Number(b.unitCost))+"</td>"+
-        "<td data-label='Status'><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></td><td data-label='Expected'>"+when+"</td>"+
-        "<td data-label='Actions'><button class='btn small' data-action='mark-received' data-id='"+b.id+"'>Mark received</button></td></tr>";
-    });
-    html += "</tbody></table></div>";
-    return html;
+    var committed = rows.reduce(function(a,b){ return a + Number(b.quantity)*Number(b.unitCost); }, 0);
+    html += "<div class='tiles mini'><div class='tile t-pending'><div class='eyebrow'>Committed</div><div class='value'>"+money(committed)+"</div><div class='sub'>across "+rows.length+" batch"+(rows.length===1?"":"es")+"</div></div></div>";
+    return html + "<div class='pre-list'>"+rows.map(function(b){ return preorderCard(b, false); }).join("")+"</div>";
   }
 
   function productChip(name){
@@ -2690,14 +2936,54 @@
     for (var i = 0; i < name.length; i++){ h = (h * 31 + name.charCodeAt(i)) % 360; }
     return "<span class='chip' style='background:linear-gradient(135deg,hsl("+h+",82%,56%),hsl("+((h+48)%360)+",84%,46%))'>"+esc(ini)+"</span>";
   }
+  // eBay's image host serves the same photo at several sizes by the number in the filename.
+  function thumbUrl(u){ return String(u||"").replace(/\/s-l\d+\./, "/s-l300."); }
+  // The listing photo when we have one; the coloured initials chip sits underneath, so a
+  // missing or ended listing (image fails to load and removes itself) still looks intentional.
+  function prodThumb(p, name, cls){
+    var img = (p && p.imageUrl)
+      ? "<img src='"+esc(thumbUrl(p.imageUrl))+"' alt='' loading='lazy' referrerpolicy='no-referrer' onerror='this.remove()'>" : "";
+    return "<span class='thumb"+(cls?" "+cls:"")+"'>"+productChip(name || (p && p.name))+img+"</span>";
+  }
+  function bySaleNewest(a,b){
+    var da = a.saleDate || "", db_ = b.saleDate || "";
+    return da < db_ ? 1 : da > db_ ? -1 : (b.createdAt||0)-(a.createdAt||0);
+  }
 
-  // One list for everything sold: what used to be split across "Orders" (screenshots, stock
-  // status, Mark received) and "Sales" (the table) is the same record, so it lives in one place.
+  // One row per sale: what used to be split across "Orders" (stock status, Mark received) and
+  // "Sales" (the table) is the same record, so it lives in one place.
+  function saleRow(s){
+    var p = productById(s.productId);
+    var name = p ? p.name : "Unknown item";
+    var hasShot = s.screenshots && s.screenshots.length;
+    var linked = batchesForSale(s.id);
+    var notRecv = linked.filter(function(b){ return b.status!=="received"; });
+    var stockTag = "", recvBtn = "";
+    if (notRecv.length){
+      stockTag = "<span class='badge status-preorder'>Not received yet</span>";
+      recvBtn = "<button class='btn small ghost' data-action='mark-sale-received' data-id='"+s.id+"'>Mark received</button>";
+    } else if (linked.length){
+      stockTag = "<span class='badge status-received'>In hand</span>";
+    }
+    var payTag = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Paid out")+"</span>" : "";
+    var autoTag = (s.ownerSource==="auto" && s.attributedTo && s.lifecycleStatus!=="completed") ? "<span class='badge label-note' title='Split automatically by who bought what. It can shift as more orders arrive until this one is paid out — tap the owner to lock it.'>Auto-split</span>" : "";
+    var labelTag = (s.profitSource==="ebay-provisional" && s.ebayShipped && s.lifecycleStatus!=="completed") ? "<span class='badge label-note' title='eBay hasn&#39;t reported the shipping label cost yet, so this is before it'>Before label cost</span>" : "";
+    return "<div class='sale-row'>"+prodThumb(p, name)+
+      "<div class='sale-main'>"+
+        "<div class='sale-title'>"+esc(name)+"</div>"+
+        "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
+        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+"</div>"+
+      "</div>"+
+      "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>net profit</div></div>"+
+      "<div class='sale-actions'>"+recvBtn+
+        (hasShot ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
+        "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
+        "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
+      "</div></div>";
+  }
+
   function renderSales(){
-    var rows = state.sales.slice().sort(function(a,b){
-      var da = a.saleDate || "", db_ = b.saleDate || "";
-      return da < db_ ? 1 : da > db_ ? -1 : (b.createdAt||0)-(a.createdAt||0);
-    });
+    var rows = state.sales.slice().sort(bySaleNewest);
     var total = totalNetProfit(), pending = pendingProfit();
     var html = "<div class='tiles mini'>"+
       "<div class='tile t-profit'><div class='eyebrow'>Total profit</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
@@ -2705,47 +2991,16 @@
       "<div class='tile t-brand'><div class='eyebrow'>Paid out</div><div class='value'>"+money(total-pending)+"</div><div class='sub'>ready to collect</div></div>"+
       "</div>";
     if (assetsCap){
-      html += "<div class='section-head'><h2>Add an order</h2></div>"+
-        "<div class='import-bar' id='dropzone' data-action='open-file-picker'>"+
+      html += "<div class='import-bar' id='dropzone' data-action='open-file-picker'>"+
           "<div class='ic' data-icon='camera'></div>"+
-          "<div><div class='lead'>Drop a screenshot or eBay CSV</div><div class='hint'>eBay orders sync in on their own every few minutes — this is only for anything the sync misses.</div></div>"+
+          "<div class='ib-text'><div class='lead'>Missing an order? Drop a screenshot or eBay CSV</div><div class='hint'>Orders sync in on their own every few minutes — this is only a backup.</div></div>"+
           "<span class='btn go'>Choose file</span></div>";
     } else {
       html += "<div class='card empty'><div class='ic' data-icon='camera'></div>Couldn't connect to screenshot storage — check your connection and reload, or use Record sale to enter an order by hand.</div>";
     }
-    html += "<div class='section-head'><h2>Sales</h2><button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></div>";
+    html += "<div class='section-head'><h2>All sales</h2><button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></div>";
     if (!rows.length){ return html + "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>"; }
-    html += "<div class='sales-list'>";
-    rows.forEach(function(s){
-      var p = productById(s.productId);
-      var name = p ? p.name : "Unknown item";
-      var shot = s.screenshots && s.screenshots.length ? s.screenshots[s.screenshots.length-1] : null;
-      var linked = batchesForSale(s.id);
-      var notRecv = linked.filter(function(b){ return b.status!=="received"; });
-      var stockTag = "", recvBtn = "";
-      if (notRecv.length){
-        stockTag = "<span class='badge status-preorder'>Not received yet</span>";
-        recvBtn = "<button class='btn small ghost' data-action='mark-sale-received' data-id='"+s.id+"'>Mark received</button>";
-      } else if (linked.length){
-        stockTag = "<span class='badge status-received'>In hand</span>";
-      }
-      var payTag = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Completed")+"</span>" : "";
-      var labelTag = (s.profitSource==="ebay-provisional" && s.ebayShipped) ? "<span class='badge label-note' title='eBay hasn&#39;t reported the shipping label cost yet, so this is before it'>Before label cost</span>" : "";
-      html += "<div class='sale-row'>"+
-        "<div class='sale-thumb'>"+(shot ? "<img src='"+esc(shot.id)+"' alt=''>" : productChip(name))+"</div>"+
-        "<div class='sale-main'>"+
-          "<div class='sale-title'>"+esc(name)+"</div>"+
-          "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
-          "<div class='sale-tags'>"+ownerBadge(s)+stockTag+payTag+labelTag+"</div>"+
-        "</div>"+
-        "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>net profit</div></div>"+
-        "<div class='sale-actions'>"+recvBtn+
-          (shot ? "<button class='btn small ghost' data-action='view-order' data-id='"+s.id+"'>View</button>" : "")+
-          "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
-          "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
-        "</div></div>";
-    });
-    return html + "</div>";
+    return html + "<div class='sales-list'>"+rows.map(saleRow).join("")+"</div>";
   }
 
   function renderSettlements(){
@@ -2785,14 +3040,14 @@
 
     html += "<div class='section-head'><h2>Payment history</h2><button class='btn primary' data-action='open-add-settlement'><span class='ic' data-icon='plus'></span> Record payment</button></div>";
     if (!rows.length){ html += "<div class='card empty'><div class='ic' data-icon='settlements'></div>No payments logged between you two yet.</div>"; return html; }
-    html += "<div class='card table-wrap'><table><thead><tr><th>Date</th><th>From</th><th>To</th><th>Amount</th><th>Note</th><th></th></tr></thead><tbody>";
+    html += "<div class='pay-list'>";
     rows.slice().reverse().forEach(function(t){
-      html += "<tr><td data-label='Date'>"+fmtDate(t.date)+"</td><td data-label='From'><span class='badge owner-"+t.from+"'>"+t.from+"</span></td><td data-label='To'><span class='badge owner-"+t.to+"'>"+t.to+"</span></td>"+
-        "<td class='num-cell' data-label='Amount'>"+money(t.amount)+"</td><td class='cell-note' data-label='Note' title='"+esc(t.note||"")+"'>"+esc(t.note||"")+"</td>"+
-        "<td data-label='Actions'><button class='btn small ghost danger' data-action='delete-settlement' data-id='"+t.id+"'>Remove</button></td></tr>";
+      html += "<div class='pay-row'>"+
+        "<div class='pay-flow'>"+ownerPill(t.from)+"<span class='pay-arrow'>→</span>"+ownerPill(t.to)+"</div>"+
+        "<div class='pay-main'><div class='pay-amt'>"+money(t.amount)+"</div><div class='sale-sub'>"+fmtDate(t.date)+(t.note?" · "+esc(t.note):"")+"</div></div>"+
+        "<button class='btn small ghost danger' data-action='delete-settlement' data-id='"+t.id+"'>Remove</button></div>";
     });
-    html += "</tbody></table></div>";
-    return html;
+    return html + "</div>";
   }
 
   function showSyncBanner(msg, isError){
@@ -2871,7 +3126,7 @@
       "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(suggested)+"</select><div class='hint'>Suggested from your priority rule (Jon fills his batch quantity first) — change it anytime.</div></div>"+
       "<div class='field'><label>Funds status</label><select id='f_funds'>"+
         "<option value='pending' selected>Pending payout</option>"+
-        "<option value='completed'>Completed</option>"+
+        "<option value='completed'>Paid out</option>"+
       "</select><div class='hint'>eBay holds buyer funds until the item ships and is delivered — leave this as Pending unless you've actually been paid out already.</div></div></div>"+
       "<div class='field'><label>Note</label><textarea id='f_note' placeholder='Optional'></textarea></div>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-add-sale'>Save sale</button>"
@@ -2892,7 +3147,7 @@
       "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(s.attributedTo)+"</select></div>"+
       "<div class='field'><label>Funds status</label><select id='f_funds'>"+
         "<option value='pending'"+(s.lifecycleStatus!=="completed"?" selected":"")+">Pending payout</option>"+
-        "<option value='completed'"+(s.lifecycleStatus==="completed"?" selected":"")+">Completed</option>"+
+        "<option value='completed'"+(s.lifecycleStatus==="completed"?" selected":"")+">Paid out</option>"+
       "</select></div></div>"+
       "<div class='field'><label>Note</label><textarea id='f_note'>"+esc(s.note||"")+"</textarea></div>"+
       "<input type='hidden' id='f_id' value='"+id+"'>",
@@ -2915,7 +3170,7 @@
       ["Item", p?p.name:"—"], ["Buyer", s.buyerName||"—"], ["Order #", s.orderNumber||"—"],
       ["Sale date", fmtDate(s.saleDate)], ["Quantity", s.quantitySold],
       ["Sold price", s.soldPrice?money(s.soldPrice):"—"], ["Net profit", money(s.netProfit)],
-      ["Goes to", s.attributedTo||"Unassigned"], ["Funds status", s.lifecycleStatus==="completed"?"Completed":"Pending payout"],
+      ["Goes to", s.attributedTo||"Unassigned"], ["Funds status", s.lifecycleStatus==="completed"?"Paid out":"Pending payout"],
       ["Stock status", stockLabel]
     ];
     var kvHtml = kv.map(function(row){ return "<div>"+esc(row[0])+"</div><div>"+esc(String(row[1]))+"</div>"; }).join("");
@@ -3050,7 +3305,7 @@
       "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(suggested)+"</select></div>"+
       "<div class='field'><label>Funds status</label><select id='f_funds'>"+
         "<option value='pending'"+(fundsStatus!=="completed"?" selected":"")+">Pending payout</option>"+
-        "<option value='completed'"+(fundsStatus==="completed"?" selected":"")+">Completed</option>"+
+        "<option value='completed'"+(fundsStatus==="completed"?" selected":"")+">Paid out</option>"+
       "</select>"+fieldHint("fundsStatus")+"</div></div>"+
       "<div class='field'><label>Alerts / notes</label><textarea id='f_note' placeholder='Auto-detected banners (policy violation, Authenticity Guarantee, etc.) show up here — edit freely'>"+esc(alerts.join("; "))+"</textarea></div>"+
       (extracted.rawText ? "<details><summary class='hint' style='cursor:pointer;'>Raw OCR text (for troubleshooting misreads)</summary>"+
@@ -3463,11 +3718,15 @@
       if (cb) cb();
       return;
     }
+    if (action==="bought-all"){ var bg = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (bg){ var bc = { Jon:0, Jax:0 }; bc[t.dataset.who] = bg.qty; applyPurchase(t.dataset.key, bc); } return; }
+    if (action==="bought-split"){ openBoughtModal(t.dataset.key); return; }
+    if (action==="submit-bought"){ applyPurchase(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); closeModal(); return; }
     if (action==="assign-owner"){ assignOwner(t.dataset.id, t.dataset.who); return; }
     if (action==="assign-all-owner"){ needsOwnerSales().forEach(function(s){ assignOwner(s.id, t.dataset.who); }); toast("All assigned to "+t.dataset.who); return; }
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
+    if (action==="goto-preorders") return setTab("preorders");
 
     if (action==="open-add-batch") return openAddBatchModal(t.dataset.product);
     if (action==="edit-batch") return openEditBatchModal(t.dataset.id);
