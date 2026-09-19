@@ -3338,6 +3338,20 @@
     return st;
   }
   function round2(v){ return Math.round(v*100)/100; }
+  // batches of the same product (any owner, any listing) that still have no price
+  function unpricedSiblings(b){
+    var pr = productById(b.productId);
+    var pids = pr ? pidsForKey(nameKey(pr.name)) : [b.productId];
+    return state.batches.filter(function(x){ return x.id!==b.id && pids.indexOf(x.productId)!==-1 && !costLogged(x); });
+  }
+  // the price already logged for this item, so it never has to be typed twice
+  function suggestedCost(pids, owner){
+    var c = state.batches.filter(function(b){ return pids.indexOf(b.productId)!==-1 && costLogged(b); });
+    if (!c.length) return null;
+    var same = c.filter(function(b){ return b.owner===owner; }), pool = same.length ? same : c;
+    pool.sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    return Number(pool[0].unitCost)||0;
+  }
   function costLogged(b){ return Number(b.unitCost) > 0 || !!b.costKnown; }
   // Is every unit of this product accounted for with a real purchase cost? (a typed 0 counts)
   function groupCost(g){
@@ -3403,7 +3417,7 @@
   }
 
   function readTrip(){
-    var t = { who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
+    var t = { both: (function(){ var r = document.querySelector("input[name='t_scope']:checked"); return r ? r.value==="all" : true; })(), who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
     var m = document.querySelector("input[name='t_mode']:checked"); if (m) t.mode = m.value;
     document.querySelectorAll(".trip-row").forEach(function(row){
       var key = row.dataset.key;
@@ -3438,8 +3452,13 @@
   }
   function updateTripSummary(){
     var box = $("#tripSummary"); if (!box) return;
+    var onlyLbl = $("#t_only"); if (onlyLbl) onlyLbl.textContent = "Only "+(($("#t_who")||{}).value || whoAmI)+"'s units";
     var c = tripCalc(readTrip());
-    if (c.problem){ box.innerHTML = "<span class='muted'>"+esc(c.problem)+"</span>"; return; }
+    if (c.problem){
+      box.innerHTML = "<span class='muted'>"+esc(c.problem)+"</span>"+
+        (/^Enter the total/.test(c.problem) && c.subtotal>0 ? " <button type='button' class='linkbtn' data-action='trip-total-items'>Use "+money(c.subtotal + (c.other||0))+" (no tax)</button>" : "");
+      return;
+    }
     box.innerHTML = "Items "+money(c.subtotal)+(c.other>0 ? " · not listed "+money(c.other) : "")+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
   }
   function openTripModal(){
@@ -3464,6 +3483,9 @@
       "<div class='field'><label>Spread tax &amp; fees</label><div class='seg-choice'>"+
         "<label><input type='radio' name='t_mode' value='prop'"+(t.mode!=="even"?" checked":"")+"> In proportion to price <small>(how sales tax works)</small></label>"+
         "<label><input type='radio' name='t_mode' value='even'"+(t.mode==="even"?" checked":"")+"> Evenly per unit</label></div></div>"+
+      "<div class='field'><label>Apply these prices to</label><div class='seg-choice'>"+
+        "<label><input type='radio' name='t_scope' value='all'"+(t.both===false ? "" : " checked")+"> Both Jon and Jax <small>(also fills the other person's units that have no price yet; never overwrites a price that's already logged)</small></label>"+
+        "<label><input type='radio' name='t_scope' value='mine'"+(t.both===false ? " checked" : "")+"> <span id='t_only'>Only "+esc(t.who)+"'s units</span></label></div></div>"+
       "<div class='trip-listhead'><span>Items on this receipt</span><button type='button' class='linkbtn' data-action='trip-toggle-all'>Clear all</button></div>"+
       "<div class='trip-list'>"+rows+"</div>"+
       "<div class='trip-summary' id='tripSummary'></div>",
@@ -3519,12 +3541,19 @@
     var rows = c.rows.map(function(r){
       return "<div class='confirm-row trip-out'><span>"+esc(r.g.p.name)+"<small>"+r.qty+" × "+money(r.price)+" + "+money(r.extraEach)+" tax &amp; fees</small></span><b>"+money(r.final)+"<small>each</small></b></div>";
     }).join("");
+    var otherN = 0;
+    if (t.both !== false){
+      c.rows.forEach(function(r){
+        state.batches.forEach(function(b){ if (r.g.pids.indexOf(b.productId)!==-1 && b.owner!==t.who && !costLogged(b)) otherN += Number(b.quantity||0); });
+      });
+    }
+    var bothNote = otherN ? " Also fills in "+otherN+" unit"+(otherN===1?"":"s")+" of "+(t.who==="Jon"?"Jax":"Jon")+"'s that "+(otherN===1?"has":"have")+" no price yet." : "";
     openModal("Confirm unit costs",
       "<div class='sale-sub'>"+ownerPill(t.who)+" paid "+money(c.total)+" · "+c.units+" unit"+(c.units===1?"":"s")+
         (c.other>0 ? " + "+money(c.other)+" of other items not listed" : "")+"</div>"+
       "<div class='confirm-list' style='margin-top:10px'>"+rows+"</div>"+
       "<div class='hint'>These become the unit cost on "+esc(t.who)+"'s batches of each item"+(Math.abs(paidSum-c.total)>=0.01 ? " (rounded to the cent, "+money(paidSum)+" in total)" : "")+
-      ". An item with no batch for "+esc(t.who)+" gets one created. You can undo right after.</div>",
+      ". An item with no batch for "+esc(t.who)+" gets one created. You can undo right after."+bothNote+"</div>",
       "<button class='btn' data-action='trip-back'>Back</button><button class='btn primary' data-action='trip-apply'>Apply costs</button>");
   }
   function applyTrip(){
@@ -3533,6 +3562,12 @@
     var undo = { changed:[], created:[] }, today = todayISO();
     c.rows.forEach(function(r){
       var mine = state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner===t.who; });
+      if (t.both !== false){
+        state.batches.filter(function(b){ return r.g.pids.indexOf(b.productId)!==-1 && b.owner!==t.who && !costLogged(b); }).forEach(function(b){
+          undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
+          updateBatch(b.id, { unitCost:r.final, costKnown:true, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+        });
+      }
       if (mine.length){
         mine.forEach(function(b){
           undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, note:b.note||"", needsReview:!!b.needsReview });
@@ -3868,10 +3903,11 @@
 
   function openAddBatchModal(productId){
     var p = productById(productId);
+    var addSug = p ? suggestedCost(pidsForKey(nameKey(p.name)), whoAmI) : null;
     openModal("Add batch — "+(p?p.name:""),
       "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(whoAmI)+"</select></div>"+
       "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='1'></div></div>"+
-      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00'></div>"+
+      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00' value='"+(addSug!=null ? addSug : "")+"'>"+(addSug!=null ? "<div class='hint'>From this item's logged price.</div>" : "")+"</div>"+
       "<div class='field'><label>Status</label><select id='f_status'>"+statusOptions("preorder")+"</select></div></div>"+
       "<div class='field'><label>Expected arrival (if not received)</label><input id='f_arrival' type='date'></div>"+
       "<div class='field'><label>Note</label><textarea id='f_note' placeholder='Optional'></textarea></div>"+
@@ -3890,15 +3926,22 @@
     var b = state.batches.find(function(x){ return x.id===id; });
     if(!b) return;
     var p = productById(b.productId);
-    var sibs = siblingBatches(b);
-    var allUnknown = sibs.length && sibs.every(function(x){ return !Number(x.unitCost) && !x.costKnown; });
-    var applyAll = sibs.length
-      ? "<label class='check'><input type='checkbox' id='f_applyall'"+(allUnknown?" checked":"")+"> <span>Use this unit cost for the other "+sibs.length+" "+esc(b.owner)+" batch"+(sibs.length>1?"es":"")+" of this item too</span></label>"
-      : "";
+    var sibs = costLogged(b) ? [] : unpricedSiblings(b);
+    var mineSibs = sibs.filter(function(x){ return x.owner===b.owner; }), otherSibs = sibs.filter(function(x){ return x.owner!==b.owner; });
+    var units = function(a){ return a.reduce(function(n,x){ return n + Number(x.quantity||0); }, 0); };
+    var otherName = b.owner==="Jon" ? "Jax" : "Jon";
+    var sug = costLogged(b) ? null : suggestedCost(pidsForKey(nameKey(p ? p.name : "")), b.owner);
+    var applyAll = (sug!=null ? "<div class='hint' style='margin-top:-6px'>Filled in from the price already logged for this item. Change it if this one cost something different.</div>" : "")+
+      (sibs.length
+        ? "<div class='field'><label>Use this price for</label><div class='seg-choice'>"+
+            (otherSibs.length ? "<label><input type='radio' name='f_scope' value='all' checked> Everyone's units with no price yet <small>("+esc(b.owner)+" "+units(mineSibs)+" more, "+esc(otherName)+" "+units(otherSibs)+")</small></label>" : "")+
+            (mineSibs.length ? "<label><input type='radio' name='f_scope' value='mine'"+(otherSibs.length?"":" checked")+"> Just "+esc(b.owner)+"'s other units with no price yet <small>("+units(mineSibs)+")</small></label>" : "")+
+            "<label><input type='radio' name='f_scope' value='one'> Only this batch</label></div></div>"
+        : "");
     openModal("Edit batch — "+(p?p.name:""),
       "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(b.owner)+"</select></div>"+
       "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='"+b.quantity+"'></div></div>"+
-      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00' value='"+((b.unitCost||b.costKnown) ? b.unitCost : "")+"'></div>"+
+      "<div class='row2'><div class='field'><label>Unit cost</label><input id='f_cost' type='number' min='0' step='0.01' placeholder='0.00' value='"+((b.unitCost||b.costKnown) ? b.unitCost : (sug!=null ? sug : ""))+"'></div>"+
       "<div class='field'><label>Status</label><select id='f_status'>"+statusOptions(b.status)+"</select></div></div>"+
       "<div class='field'><label>Expected arrival</label><input id='f_arrival' type='date' value='"+(b.expectedArrival||"")+"'></div>"+
       applyAll+
@@ -4540,6 +4583,9 @@
     if (action==="assign-all-owner"){ openOwnerConfirm(needsOwnerSales().map(function(x){ return x.id; }), t.dataset.who, false); return; }
     if (action==="open-trip"){ pendingTrip = null; openTripModal(); return; }
     if (action==="trip-review"){ openTripConfirm(); return; }
+    if (action==="trip-total-items"){
+      var cc = tripCalc(readTrip()); $("#t_total").value = round2(cc.subtotal + (cc.other||0)); updateTripSummary(); return;
+    }
     if (action==="trip-zero"){ var r1 = t.closest(".trip-row"); if (r1){ r1.querySelector(".trip-price").value = "0"; clearTripFlag(r1); updateTripSummary(); } return; }
     if (action==="trip-skip"){ var r2 = t.closest(".trip-row"); if (r2){ r2.querySelector(".trip-chk").checked = false; clearTripFlag(r2); updateTripSummary(); } return; }
     if (action==="trip-zero-all" || action==="trip-skip-all"){
@@ -4631,14 +4677,14 @@
         receivedDate: newStatus==="received" ? ((oldB && oldB.status==="received" && oldB.receivedDate) || todayISO()) : null,
         note: editedNote, needsReview:false
       });
-      var applyBox = $("#f_applyall"), nApplied = 0;
-      if (applyBox && applyBox.checked && costRaw!=="" && oldB){
-        siblingBatches(oldB).forEach(function(x){
+      var scopeEl = document.querySelector("input[name='f_scope']:checked"), nApplied = 0;
+      if (scopeEl && scopeEl.value!=="one" && costRaw!=="" && oldB){
+        unpricedSiblings(oldB).filter(function(x){ return scopeEl.value==="all" || x.owner===oldB.owner; }).forEach(function(x){
           nApplied++;
           updateBatch(x.id, { unitCost:newCost, costKnown:true, needsReview:false, note:(x.note===AUTO_BATCH_NOTE || x.note===PURCHASE_NOTE) ? "" : (x.note||"") });
         });
       }
-      toast(nApplied ? "Cost applied to this batch and "+nApplied+" more" : "Batch updated");
+      toast(nApplied ? "Price applied to this batch and "+nApplied+" more" : "Batch updated");
       closeModal();
       return;
     }
