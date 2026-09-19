@@ -552,7 +552,7 @@
     .bottom-tabbar .navbtn.active .ic{ box-shadow:0 8px 16px -6px var(--tabc); }
     .tiles.mini{ grid-template-columns:repeat(auto-fit,minmax(104px,1fr)); gap:8px; }
     .tiles.mini .tile{ padding:12px 12px 14px; border-radius:18px; }
-    .tiles.mini .tile .eyebrow{ font-size:9.5px; letter-spacing:.06em; }
+    .tiles.mini .tile .eyebrow{ font-size:11px; letter-spacing:.04em; }
     .tiles.mini .tile .value{ font-size:19px; }
     .tiles.mini .tile .sub{ font-size:11px; }
     .tiles.mini .tile::before, .tiles.mini .tile::after{ display:none; }
@@ -658,7 +658,7 @@
     .stat-strip{ grid-template-columns:repeat(4,1fr); gap:6px; padding:0 14px 12px; }
     .stat{ padding:8px 6px; text-align:center; border-radius:14px; }
     .stat b{ font-size:17px; }
-    .stat span{ font-size:9px; letter-spacing:.03em; }
+    .stat span{ font-size:10.5px; letter-spacing:.02em; }
     .product-head{ padding:16px 14px 12px; }
     .short-note{ margin:0 14px 14px; }
     .batch-list{ padding:0 10px 12px; }
@@ -693,6 +693,18 @@
   .confirm-list{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; max-height:34vh; overflow-y:auto; }
   .confirm-row{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:9px 12px; background:var(--surface-2); border-radius:12px; font-size:13px; }
   .toast-btn{ margin-left:12px; background:rgba(255,255,255,.2); color:inherit; border:0; border-radius:99px; padding:4px 13px; font-weight:700; font-size:13px; cursor:pointer; }
+
+  /* audit: comfortable tap targets on touch screens, and no text under 11px */
+  @media (pointer: coarse){
+    .btn.small, .btn.ghost.small, .owner-queue-row .who .btn, .flip-owner, [data-action="flip-owner"]{ min-height:40px; padding-top:9px; padding-bottom:9px; }
+    select, .who select, #whoSel{ min-height:40px; }
+  }
+  .navbtn span:not(.ic){ font-size:11px; }
+  .oq-badge, .tile .eyebrow, th, .stat span{ font-size:11px; }
+  @media (max-width: 480px){
+    .tiles.mini .tile .eyebrow, .stat span{ font-size:11px; letter-spacing:.04em; }
+    .tiles.mini .tile .sub{ font-size:11.5px; }
+  }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -763,7 +775,8 @@
   var assetsCap = null;
   var scanState = { active:false, label:"" };
   var tab = "overview";
-  var whoAmI = localStorage.getItem("flipLedgerWhoAmI") || "Jon";
+  var whoAmI = "Jon";
+  try { whoAmI = localStorage.getItem("flipLedgerWhoAmI") || "Jon"; } catch(e){}
 
   // ---------- offline OCR (Tesseract.js, self-hosted — no Claude AI call needed) ----------
   var tessWorkerPromise = null;
@@ -1943,7 +1956,7 @@
       }
     }
 
-    var todayStr = new Date().toISOString().slice(0,10);
+    var todayStr = todayISO();
     if (extracted.buyerPaidDate && extracted.buyerPaidDate > todayStr){
       flag("buyerPaidDate", "warn", "Buyer paid date ("+extracted.buyerPaidDate+") is in the future — likely a misread digit.");
     }
@@ -2061,7 +2074,7 @@
   function el(tag, cls, html){ var e=document.createElement(tag); if(cls) e.className=cls; if(html!=null) e.innerHTML=html; return e; }
   function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
   function uid(){ return Math.random().toString(36).slice(2,10); }
-  function todayISO(){ return new Date().toISOString().slice(0,10); }
+  function todayISO(){ var d=new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
   function money(n){ var v=Number(n||0); var s=v<0?"-":""; return s+"$"+Math.abs(v).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function fmtDate(iso){ if(!iso) return "—"; var d=new Date(iso+"T00:00:00"); if(isNaN(d)) return "—"; return d.toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"}); }
   function daysUntil(iso){ if(!iso) return null; var t=new Date(todayISO()+"T00:00:00"); var d=new Date(iso+"T00:00:00"); if(isNaN(d)) return null; return Math.round((d-t)/86400000); }
@@ -2075,11 +2088,17 @@
   function productById(id){ return state.products.find(function(p){ return p.id===id; }); }
 
   // ---------- persistence layer ----------
+  var renderQueued = false;
+  function scheduleRender(){
+    if (renderQueued) return;
+    renderQueued = true;
+    requestAnimationFrame(function(){ renderQueued = false; render(); });
+  }
   function subscribeCollections(){
     function sub(name, target){
       db.collection(name).orderBy("createdAt","asc").onSnapshot(function(snap){
         state[target] = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
-        render();
+        scheduleRender();
       }, function(e){
         if (e.code === "revoked"){ showSyncBanner("Live sync stopped for this session — reload the page to reconnect.", true); }
         else { console.warn("db error", target, e); }
@@ -4119,7 +4138,7 @@
   var whoSel = $("#whoAmI");
   OWNERS.forEach(function(o){ var opt=document.createElement("option"); opt.value=o; opt.textContent=o; whoSel.appendChild(opt); });
   whoSel.value = whoAmI;
-  whoSel.addEventListener("change", function(){ whoAmI = whoSel.value; localStorage.setItem("flipLedgerWhoAmI", whoAmI); render(); });
+  whoSel.addEventListener("change", function(){ whoAmI = whoSel.value; try { localStorage.setItem("flipLedgerWhoAmI", whoAmI); } catch(e){} render(); });
 
   // ---------- boot ----------
   function seedLocalExample(){
