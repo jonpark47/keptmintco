@@ -758,6 +758,7 @@
   .confirm-row b{ font-variant-numeric:tabular-nums; text-align:right; }
   .oc-hero{ display:flex; align-items:center; gap:10px; margin:6px 0 14px; font-size:15px; font-weight:600; }
   .oc-hero .badge{ font-size:15px; padding:7px 16px; }
+  .opt{ font-weight:500; opacity:.7; }
   .check{ display:flex; gap:10px; align-items:flex-start; margin:4px 0 14px; font-size:13.5px; line-height:1.4; cursor:pointer; }
   .check input{ margin-top:3px; width:18px; height:18px; flex:0 0 auto; }
   /* store trip */
@@ -798,6 +799,14 @@
   .split-rows span{ flex:1 1 auto; color:var(--ink); }
   .split-rows b{ font-variant-numeric:tabular-nums; margin-right:12px; }
   .split-rows em{ font-style:normal; color:var(--muted); font-size:12.5px; width:38px; text-align:right; font-variant-numeric:tabular-nums; }
+
+  .trip-cta{ display:flex; align-items:center; gap:14px; width:100%; box-sizing:border-box; text-align:left; margin-bottom:14px; padding:14px 16px; border:0; border-radius:20px; background:var(--tabg, var(--accent)); color:#fff; font:inherit; cursor:pointer; box-shadow:0 12px 24px -14px var(--tabc, var(--accent)); }
+  .trip-cta .ic{ width:38px; height:38px; flex:0 0 auto; display:grid; place-items:center; background:rgba(255,255,255,.2); border-radius:12px; }
+  .trip-cta .ic svg{ width:22px; height:22px; }
+  .trip-cta-text{ flex:1 1 auto; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .trip-cta-text b{ font-size:15px; font-weight:700; }
+  .trip-cta-text small{ font-size:12.5px; opacity:.92; line-height:1.35; }
+  .trip-cta-go{ flex:0 0 auto; background:#fff; color:var(--tabc, var(--accent)); font-weight:700; font-size:13px; padding:8px 16px; border-radius:99px; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2941,11 +2950,12 @@
     });
     return res;
   }
-  function applyPurchase(key, counts){
+  function applyPurchase(key, counts, unitCost){
     var g = purchaseGroups().filter(function(x){ return x.key===key; })[0];
     if (!g) return;
     counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
     if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
+    var cost = Number(unitCost) > 0 ? round2(Number(unitCost)) : 0;
     var undo = { created:[], removed:[], sales:[] };
     // the $0 "covers a sale" placeholders are replaced by the real purchase below
     state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1 && b.note===AUTO_BATCH_NOTE && !Number(b.unitCost); })
@@ -2972,17 +2982,17 @@
         if (!q) return;
         used += q;
         var allShipped = mine.every(function(s){ return s.ebayShipped || s.lifecycleStatus==="completed"; });
-        Promise.resolve(addBatch({ productId:pid, owner:o, quantity:q, unitCost:0, status: allShipped?"received":"preorder",
-                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:true, note:PURCHASE_NOTE }))
+        Promise.resolve(addBatch({ productId:pid, owner:o, quantity:q, unitCost:cost, status: allShipped?"received":"preorder",
+                   receivedDate: allShipped?todayISO():null, expectedArrival:null, needsReview:!cost, note:cost ? "" : PURCHASE_NOTE }))
           .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
       });
       var extra = counts[o] - used;
-      if (extra > 0) Promise.resolve(addBatch({ productId:primary, owner:o, quantity:extra, unitCost:0, status:"received",
-                                receivedDate:todayISO(), expectedArrival:null, needsReview:true, note:PURCHASE_NOTE }))
+      if (extra > 0) Promise.resolve(addBatch({ productId:primary, owner:o, quantity:extra, unitCost:cost, status:"received",
+                                receivedDate:todayISO(), expectedArrival:null, needsReview:!cost, note:cost ? "" : PURCHASE_NOTE }))
         .then(function(ref){ undo.created.push(ref && ref.id ? ref.id : ref); });
     });
     lastPurchaseUndo = undo;
-    toastAction("Saved — sales split by who bought what.", "Undo", "undo-purchase");
+    toastAction(cost ? "Saved — sales split and unit cost set to "+money(cost)+"." : "Saved — sales split by who bought what.", "Undo", "undo-purchase");
   }
   function undoPurchase(){
     var u = lastPurchaseUndo;
@@ -3000,7 +3010,7 @@
     if (!g) return;
     counts = { Jon: Math.max(0, Math.floor(Number(counts.Jon)||0)), Jax: Math.max(0, Math.floor(Number(counts.Jax)||0)) };
     if (!counts.Jon && !counts.Jax){ toast("Enter how many each of you bought"); return; }
-    pendingBought = { key:key, counts:counts };
+    pendingBought = { key:key, counts:counts, cost:(pendingBought && pendingBought.key===key && pendingBought.cost) || "" };
     var alloc = allocateSales(g.sales, counts), units = { Jon:0, Jax:0 };
     var rows = g.sales.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
       var o = (s.id in alloc) ? alloc[s.id] : s.attributedTo, q = Number(s.quantitySold||1);
@@ -3016,7 +3026,10 @@
     openModal("Confirm who bought this",
       "<div class='sale-sub'>"+esc(p?p.name:"This item")+" — "+g.qty+" sold so far</div>"+
       "<div class='confirm-counts'><div class='cc jon'><b>"+counts.Jon+"</b><span>Jon bought</span></div><div class='cc jax'><b>"+counts.Jax+"</b><span>Jax bought</span></div></div>"+
-      "<div class='sale-sub' style='margin:2px 0 6px'>Each sale would go to:</div><div class='confirm-list'>"+rows+"</div>"+notes,
+      "<div class='sale-sub' style='margin:2px 0 6px'>Each sale would go to:</div><div class='confirm-list'>"+rows+"</div>"+notes+
+      "<div class='field' style='margin-top:14px'><label for='p_cost'>Unit cost each ($) <span class='opt'>optional</span></label>"+
+      "<input id='p_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(pendingBought.cost)+"'>"+
+      "<div class='hint'>What you paid per unit, tax included. Leave it blank to add it later; profit fills in once it's set.</div></div>",
       "<button class='btn' data-action='bought-split' data-key='"+esc(key)+"'>Back</button>"+
       "<button class='btn primary' data-action='confirm-purchase' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Confirm</button>");
   }
@@ -3381,8 +3394,12 @@
     var plist = productGroupList();
     var totalItems = plist.length;
     if (invQ.trim()) plist = plist.filter(function(g){ return matchesQuery(g.p.name, invQ); });
-    var html = "<div class='section-head'><h2>Products</h2>"+(totalItems ? "<button class='btn' data-action='open-trip'><span class='ic' data-icon='receipt'></span> Log a store trip</button>" : "")+
-      "<span class='count'>"+(invQ.trim() ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
+    var html = "<div class='section-head'><h2>Products</h2>"+"<span class='count'>"+(invQ.trim() ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
+    if (totalItems){
+      html += "<button type='button' class='trip-cta' data-action='open-trip'><span class='ic' data-icon='receipt'></span>"+
+        "<span class='trip-cta-text'><b>Log a store trip</b><small>Bought several items on one receipt? Add the total once and set every unit cost.</small></span>"+
+        "<span class='trip-cta-go'>Start</span></button>";
+    }
     if (totalItems > 3){
       html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
         "<input id='invSearch' type='search' placeholder='Search products' value='"+esc(invQ)+"' aria-label='Search products' autocomplete='off'></div></div>";
@@ -4309,11 +4326,12 @@
     }
     if (action==="bought-all"){ var bg = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (bg){ var bc = { Jon:0, Jax:0 }; bc[t.dataset.who] = bg.qty; openPurchaseConfirm(t.dataset.key, bc); } return; }
     if (action==="bought-even"){ var be = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (be) openPurchaseConfirm(t.dataset.key, { Jon:Math.ceil(be.qty/2), Jax:Math.floor(be.qty/2) }); return; }
-    if (action==="bought-split"){ openBoughtModal(t.dataset.key); return; }
+    if (action==="bought-split"){
+      if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
     if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
-    if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }); pendingBought = null; closeModal(); return; }
+    if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }, ($("#p_cost")||{}).value); pendingBought = null; closeModal(); return; }
     if (action==="undo-purchase"){ undoPurchase(); var tt = t.closest(".toast"); if (tt) tt.remove(); return; }
     if (action==="assign-owner"){ openOwnerConfirm([t.dataset.id], t.dataset.who, false); return; }
     if (action==="assign-all-owner"){ openOwnerConfirm(needsOwnerSales().map(function(x){ return x.id; }), t.dataset.who, false); return; }
