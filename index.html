@@ -839,6 +839,19 @@
   .trip-blankbar{ background:var(--accent-soft); }
   .trip-warn span, .trip-blankbar span{ color:var(--accent); }
   .warn-dot{ background:var(--accent); }
+
+  .cost-badge{ display:inline-flex; align-items:center; gap:5px; margin-left:6px; padding:3px 10px 3px 8px; border-radius:99px; font-size:11.5px; font-weight:700; background:var(--accent-soft); color:var(--accent); vertical-align:middle; }
+  .cost-badge .ic{ width:14px; height:14px; display:inline-flex; }
+  .cost-badge .ic svg{ width:14px; height:14px; }
+  .cost-badge.ok{ background:var(--good-soft); color:var(--good); }
+  .cost-big{ font-size:14px; color:var(--muted); font-weight:600; }
+  .cost-big b{ font-size:30px; color:var(--ink); font-variant-numeric:tabular-nums; margin-right:4px; }
+  .cost-bar{ height:12px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
+  .cost-bar span{ display:block; height:100%; border-radius:99px; background:var(--good); }
+  .cost-list{ display:flex; flex-direction:column; gap:8px; }
+  .cost-list > div{ display:flex; align-items:flex-start; gap:8px; font-size:13px; font-weight:600; color:var(--ink); line-height:1.3; }
+  .cost-list .ic{ width:16px; height:16px; flex:0 0 auto; color:var(--accent); margin-top:1px; }
+  .cost-list .ic svg{ width:16px; height:16px; }
 </style>
 </head>
 <body data-tab="overview">
@@ -903,7 +916,7 @@
   var TABS = ["overview","inventory","preorders","sales","settlements"];
   function tabFromHash(){ var h = (location.hash||"").replace("#",""); return TABS.indexOf(h)>=0 ? h : null; }
   if (tabFromHash()) tab = tabFromHash();
-  var salesQ = "", salesFilter = "all", salesShown = 30, invQ = "";
+  var salesQ = "", salesFilter = "all", salesShown = 30, invQ = "", invFilter = "all";
   var loaded = { products:false, batches:false, sales:false, settlements:false };
   var syncMeta = null;
   var whoAmI = "Jon";
@@ -2193,6 +2206,7 @@
     settlements: '<path d="M7 8h11l-3-3M17 16H6l3 3"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>',
+    coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.4-.8-1.3-1.2-2.5-1.2-1.5 0-2.5.7-2.5 1.8s1 1.5 2.5 1.8 2.5.7 2.5 1.8-1 1.8-2.5 1.8c-1.2 0-2.1-.4-2.5-1.2M12 6.5V8M12 16v1.5"/>',
     search: '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
     warning: '<path d="M12 3.5l9.5 16.5H2.5z"/><path d="M12 10v4.2"/><circle cx="12" cy="17" r=".55" fill="currentColor" stroke="none"/>',
     info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5.5"/><circle cx="12" cy="8" r=".55" fill="currentColor" stroke="none"/>',
@@ -3188,6 +3202,7 @@
     });
     if (groups.length > 6) html += "<div class='sale-sub' style='margin-top:6px'>+ "+(groups.length-6)+" more in Inventory</div>";
     html += "</div>";
+    html += costCardHtml();
     // --- who earns what
     var by = { Jon:0, Jax:0, none:0 };
     state.sales.forEach(function(sa){ by[sa.attributedTo==="Jon" ? "Jon" : sa.attributedTo==="Jax" ? "Jax" : "none"] += Number(sa.netProfit||0); });
@@ -3281,7 +3296,7 @@
     return "<div class='pre-card'>"+prodThumb(p, name)+
       "<div class='pre-main'><div class='pre-title'>"+esc(name)+"</div>"+
         "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span></div>"+
-        "<div class='sale-sub'>"+money(b.unitCost)+" each · "+money(cost)+" committed</div></div>"+
+        "<div class='sale-sub'>"+(costLogged(b) ? money(b.unitCost)+" each · "+money(cost)+" committed" : "cost not logged yet")+"</div></div>"+
       "<div class='pre-when'><div class='pre-date'>"+(b.expectedArrival?fmtDate(b.expectedArrival):"—")+"</div>"+whenPill(b.expectedArrival)+
         (compact ? "" : "<button class='btn small primary' data-action='mark-received' data-id='"+b.id+"'>Mark received</button>")+
       "</div></div>";
@@ -3302,6 +3317,40 @@
     return st;
   }
   function round2(v){ return Math.round(v*100)/100; }
+  function costLogged(b){ return Number(b.unitCost) > 0 || !!b.costKnown; }
+  // Is every unit of this product accounted for with a real purchase cost? (a typed 0 counts)
+  function groupCost(g){
+    var bs = state.batches.filter(function(b){ return g.pids.indexOf(b.productId)!==-1; });
+    var units = 0, costed = 0;
+    bs.forEach(function(b){ var q = Number(b.quantity||0); units += q; if (costLogged(b)) costed += q; });
+    var noBatch = bs.length === 0;
+    if (noBatch) units = groupStock(g.pids).sold;
+    return { units:units, costed:costed, noBatch:noBatch, missing: noBatch ? units>0 : costed < units };
+  }
+  function costBadge(c){
+    if (!c.missing) return "<span class='cost-badge ok'><span class='ic' data-icon='check'></span>Cost logged</span>";
+    var txt = (c.noBatch || c.costed===0) ? "Cost missing" : "Cost missing · "+c.costed+" of "+c.units+" units";
+    return "<span class='cost-badge'><span class='ic' data-icon='coin'></span>"+txt+"</span>";
+  }
+  function costCardHtml(){
+    var gs = productGroupList().map(function(g){ return { g:g, c:groupCost(g) }; });
+    if (!gs.length) return "";
+    var missing = gs.filter(function(x){ return x.c.missing; }), done = gs.length - missing.length;
+    var pct = Math.round(done/gs.length*100);
+    var h = "<div class='card dash-card'><div class='dash-head'><h3>Costs logged</h3>"+
+      (missing.length ? "<button class='btn small' data-action='goto-costs'>Fill in</button>" : "<span class='cost-badge ok'><span class='ic' data-icon='check'></span>All set</span>")+"</div>"+
+      "<div class='cost-big'><b>"+done+"</b> of "+gs.length+" items have their cost</div>"+
+      "<div class='cost-bar' role='img' aria-label='"+done+" of "+gs.length+" items costed'><span style='width:"+pct+"%'></span></div>";
+    if (missing.length){
+      h += "<div class='cost-list'>"+missing.slice(0,4).map(function(x){
+        return "<div><span class='ic' data-icon='coin'></span><span>"+esc(x.g.p.name)+"</span></div>";
+      }).join("")+"</div>";
+      if (missing.length > 4) h += "<div class='sale-sub'>+ "+(missing.length-4)+" more</div>";
+    } else {
+      h += "<div class='sale-sub'>Every item has a cost, so profit is fully tracked.</div>";
+    }
+    return h + "</div>";
+  }
 
   function readTrip(){
     var t = { who: ($("#t_who")||{}).value || whoAmI, total: ($("#t_total")||{}).value || "", other: ($("#t_other")||{}).value || "", otherQty: ($("#t_otherqty")||{}).value || "1", mode: "prop", items:{} };
@@ -3467,18 +3516,27 @@
     // combined, split per person); the data underneath is untouched.
     var plist = productGroupList();
     var totalItems = plist.length;
+    var missingN = plist.filter(function(g){ return groupCost(g).missing; }).length;
     if (invQ.trim()) plist = plist.filter(function(g){ return matchesQuery(g.p.name, invQ); });
-    var html = "<div class='section-head'><h2>Products</h2>"+"<span class='count'>"+(invQ.trim() ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
+    if (invFilter === "missing") plist = plist.filter(function(g){ return groupCost(g).missing; });
+    var html = "<div class='section-head'><h2>Products</h2>"+"<span class='count'>"+((invQ.trim() || invFilter!=="all") ? plist.length+" of "+totalItems : totalItems+" item"+(totalItems===1?"":"s"))+"</span></div>";
     if (totalItems){
       html += "<button type='button' class='trip-cta' data-action='open-trip'><span class='ic' data-icon='receipt'></span>"+
         "<span class='trip-cta-text'><b>Log a store trip</b><small>Bought several items on one receipt? Add the total once and set every unit cost.</small></span>"+
         "<span class='trip-cta-go'>Start</span></button>";
     }
+    if (totalItems){
+      html += "<div class='fchips' style='margin-bottom:12px'>"+[["all","All",totalItems],["missing","Missing cost",missingN]].map(function(c){
+        return "<button type='button' class='fchip"+(invFilter===c[0]?" on":"")+"' data-action='inv-filter' data-f='"+c[0]+"'>"+c[1]+"<b>"+c[2]+"</b></button>";
+      }).join("")+"</div>";
+    }
     if (totalItems > 3){
       html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
         "<input id='invSearch' type='search' placeholder='Search products' value='"+esc(invQ)+"' aria-label='Search products' autocomplete='off'></div></div>";
     }
-    if (totalItems && !plist.length) return html + "<div class='card empty'><div class='ic' data-icon='search'></div>No products match that search.</div>";
+    if (totalItems && !plist.length) return html + (invFilter==="missing" && !invQ.trim()
+      ? "<div class='card empty'><div class='ic' data-icon='check'></div>Every item has its cost logged.</div>"
+      : "<div class='card empty'><div class='ic' data-icon='search'></div>No products match that search.</div>");
     if (!state.products.length){
       html += "<div class='card empty'><div class='ic' data-icon='box'></div>Nothing yet — orders sync in from eBay on their own and this fills in automatically.</div>";
       return html;
@@ -3493,7 +3551,7 @@
       var onHand = Math.max(0, stock.remaining), short = Math.max(0, -stock.remaining);
       html += "<div class='card product-card'>"+
         "<div class='product-head'><div class='product-title'>"+prodThumb(p, p.name, "lg")+
-          "<div class='pt-text'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span></div></div></div>"+
+          "<div class='pt-text'><h3>"+esc(p.name)+"</h3><span class='cat'>"+esc(p.category||"Other")+"</span> "+costBadge(groupCost(grp))+"</div></div></div>"+
         "<div class='stat-strip'>"+
           "<div class='stat good'><b>"+stock.received+"</b><span>Received</span></div>"+
           "<div class='stat'><b>"+stock.sold+"</b><span>Sold</span></div>"+
@@ -3517,7 +3575,7 @@
           var when = b.status==="received"
             ? "Received "+fmtDate(b.receivedDate)
             : (b.expectedArrival ? "Expected "+fmtDate(b.expectedArrival) : "No date set");
-          var ph = b.needsReview || (b.note===AUTO_BATCH_NOTE && !Number(b.unitCost));
+          var ph = !costLogged(b);
           html += "<div class='batch-row'>"+
             "<div class='batch-main'>"+
               "<div class='sale-tags'>"+ownerPill(b.owner)+"<span class='badge qty'>×"+b.quantity+"</span><span class='badge status-"+b.status+"'>"+STATUS_LABEL[b.status]+"</span>"+
@@ -3629,13 +3687,14 @@
     }
     html += "<div class='section-head'><h2>All sales</h2><button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></div>";
     if (!rows.length){ return html + "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>"; }
-    var counts = { all:rows.length, pending:0, paid:0, unassigned:0, Jon:0, Jax:0 };
+    var counts = { all:rows.length, pending:0, paid:0, unassigned:0, nocost:0, Jon:0, Jax:0 };
     rows.forEach(function(sa){
+      if (saleProfit(sa)==null) counts.nocost++;
       if (sa.lifecycleStatus==="pending") counts.pending++;
       if (sa.lifecycleStatus==="completed") counts.paid++;
       if (!sa.attributedTo) counts.unassigned++; else counts[sa.attributedTo]++;
     });
-    var chipDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["Jon","Jon"],["Jax","Jax"]];
+    var chipDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["nocost","Missing cost"],["Jon","Jon"],["Jax","Jax"]];
     html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
       "<input id='salesSearch' type='search' placeholder='Search buyer, item or order #' value='"+esc(salesQ)+"' aria-label='Search sales' autocomplete='off'></div>"+
       "<div class='fchips'>"+chipDefs.map(function(c){
@@ -3645,6 +3704,7 @@
       if (salesFilter==="pending" && sa.lifecycleStatus!=="pending") return false;
       if (salesFilter==="paid" && sa.lifecycleStatus!=="completed") return false;
       if (salesFilter==="unassigned" && sa.attributedTo) return false;
+      if (salesFilter==="nocost" && saleProfit(sa)!=null) return false;
       if ((salesFilter==="Jon" || salesFilter==="Jax") && sa.attributedTo!==salesFilter) return false;
       if (!salesQ.trim()) return true;
       var pr = productById(sa.productId);
@@ -3690,12 +3750,12 @@
       : money(mine.available)+" available · nothing pending right now";
     var rp = ownerRealProfit(whoAmI);
     var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div>"+
-      "<div class='tile t-brand'><div class='eyebrow'>Your profit</div><div class='value'>"+(rp.missing ? "—" : money(rp.profit))+"</div><div class='sub'>"+
-        (rp.missing ? "Add the unit cost on "+rp.missing+" sale"+(rp.missing===1?"":"s")+" (Inventory, Edit batch) and this fills in." : "Payout minus what you paid.")+"</div></div></div>";
+      "<div class='tile t-brand'><div class='eyebrow'>Your profit (internal)</div><div class='value'>"+money(rp.profit)+"</div><div class='sub'>"+
+        (rp.missing ? "so far, "+rp.missing+" sale"+(rp.missing===1?"":"s")+" still need a cost. " : "Payout minus what you paid. ")+"Just for your own tracking. It never changes what you and Jax owe each other.</div></div></div>";
 
     html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
     html += "<div class='tiles'>"+
-      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed.</div></div>"+
+      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it.</div></div>"+
       "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
       "</div>";
 
@@ -4404,6 +4464,8 @@
       if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
     if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
+    if (action==="inv-filter"){ invFilter = t.dataset.f; render(); return; }
+    if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
     if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }, ($("#p_cost")||{}).value); pendingBought = null; closeModal(); return; }
     if (action==="undo-purchase"){ undoPurchase(); var tt = t.closest(".toast"); if (tt) tt.remove(); return; }
