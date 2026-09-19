@@ -674,6 +674,16 @@
     .sale-actions{ justify-content:flex-start; border-top:1px dashed var(--border); padding-top:8px; }
     .modal-backdrop{ padding:12px; }
   }
+
+  /* the "needs you" panels: neutral card, one accent, no warning-yellow frame */
+  .owner-queue{ background:var(--surface); border:1px solid var(--border); border-radius:22px; padding:16px 18px; box-shadow:var(--shadow); margin-bottom:14px; }
+  .owner-queue-head{ align-items:center; }
+  .owner-queue-head > span:first-child{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+  .oq-badge{ background:var(--g-brand); color:#fff; font-size:10.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; padding:4px 11px; border-radius:99px; }
+  .owner-queue-row{ background:var(--surface-2); box-shadow:none; border-radius:16px; }
+  .owner-queue-row .who .btn{ background:var(--surface); box-shadow:0 1px 2px rgba(60,30,140,.08); }
+  .owner-queue-row .who .btn.ghost{ background:transparent; box-shadow:none; color:var(--muted); }
+  .owner-queue-row .who{ flex-wrap:wrap; justify-content:flex-end; }
   @media (prefers-reduced-motion: reduce){ .pre-card, .pre-card:hover{ transition:none; transform:none; } }
   @media (max-width:780px){
     .owner-queue{ padding:14px 12px; border-radius:20px; }
@@ -2705,6 +2715,7 @@
       else if (units.Jon===0) owner = "Jax";
       else if (left.Jon >= q) owner = "Jon";
       else if (left.Jax >= q) owner = "Jax";
+      else if (left.Jon>0 || left.Jax>0) owner = left.Jon >= left.Jax ? "Jon" : "Jax"; // an order can't be split: whoever has more units left takes it
       if (owner) left[owner] -= q;
       res[s.id] = owner;
     });
@@ -2754,9 +2765,9 @@
     var p = productById(g.sales[0].productId);
     openModal("Who bought this?",
       "<div class='sale-sub' style='margin-bottom:12px'>"+esc(p?p.name:"This item")+" — "+g.qty+" sold so far.</div>"+
-      "<div class='row2'><div class='field'><label>Jon bought</label><input id='f_bj' type='number' min='0' step='1' value='"+g.qty+"'></div>"+
-      "<div class='field'><label>Jax bought</label><input id='f_bx' type='number' min='0' step='1' value='0'></div></div>"+
-      "<div class='hint'>Total each of you bought, including any you haven't sold yet. As more orders come in, the highest-profit ones go to Jon until his units are covered.</div>",
+      "<div class='row2'><div class='field'><label>Jon bought</label><input id='f_bj' type='number' min='0' step='1' value='"+Math.ceil(g.qty/2)+"'></div>"+
+      "<div class='field'><label>Jax bought</label><input id='f_bx' type='number' min='0' step='1' value='"+Math.floor(g.qty/2)+"'></div></div>"+
+      "<div class='hint'>Starts as an even split (the extra unit goes to Jon). Enter the total each of you bought, including any you haven't sold yet. As more orders come in, the highest-profit ones go to Jon until his units are covered.</div>",
       "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-bought' data-key='"+esc(key)+"'>Save</button>");
   }
   function renderOwnerBanner(){
@@ -2765,13 +2776,14 @@
     if ((!groups.length && !list.length) || (tab!=="overview" && tab!=="sales")){ box.innerHTML = ""; return; }
     var html = "";
     if (groups.length){
-      html += "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+groups.length+" item"+(groups.length>1?"s":"")+" sold more than once</b> — who bought "+(groups.length>1?"them":"it")+"?</span></div><div class='owner-queue-list'>"+
+      html += "<div class='owner-queue'><div class='owner-queue-head'><span><span class='oq-badge'>Needs you</span><b>"+groups.length+" item"+(groups.length>1?"s":"")+" sold more than once</b> — who bought "+(groups.length>1?"them":"it")+"?</span></div><div class='owner-queue-list'>"+
         groups.map(function(g){
           var p = productById(g.sales[0].productId), total = g.sales.reduce(function(a,s){ return a+Number(s.netProfit||0); }, 0);
           return "<div class='owner-queue-row'>"+prodThumb(p, p&&p.name)+"<div class='what'>"+esc(p?p.name:"Item")+"<span>"+g.qty+" sold · "+money(total)+" profit so far</span></div>"+
             "<div class='who'><button class='btn small' data-action='bought-all' data-key='"+esc(g.key)+"' data-who='Jon'>Jon bought all</button>"+
             "<button class='btn small' data-action='bought-all' data-key='"+esc(g.key)+"' data-who='Jax'>Jax bought all</button>"+
-            "<button class='btn small ghost' data-action='bought-split' data-key='"+esc(g.key)+"'>Both…</button></div></div>";
+            "<button class='btn small' data-action='bought-even' data-key='"+esc(g.key)+"'>Both, split evenly</button>"+
+            "<button class='btn small ghost' data-action='bought-split' data-key='"+esc(g.key)+"'>Custom</button></div></div>";
         }).join("")+"</div></div>";
     }
     if (list.length){
@@ -2781,7 +2793,7 @@
           "<div class='who'><button class='btn small' data-action='assign-owner' data-who='Jon' data-id='"+s.id+"'>Jon</button>"+
           "<button class='btn small' data-action='assign-owner' data-who='Jax' data-id='"+s.id+"'>Jax</button></div></div>";
       }).join("");
-      html += "<div class='owner-queue'><div class='owner-queue-head'><span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — highest profit first</span>"+
+      html += "<div class='owner-queue'><div class='owner-queue-head'><span><span class='oq-badge'>Needs you</span><b>"+list.length+" sale"+(list.length>1?"s":"")+" need"+(list.length>1?"":"s")+" an owner</b> — highest profit first</span>"+
         "<span><button class='btn small ghost' data-action='assign-all-owner' data-who='Jon'>All to Jon</button> <button class='btn small ghost' data-action='assign-all-owner' data-who='Jax'>All to Jax</button></span></div>"+
         "<div class='owner-queue-list'>"+rows+"</div></div>";
     }
@@ -2890,7 +2902,15 @@
           "<div class='stat'><b>"+onHand+"</b><span>On hand</span></div>"+
           "<div class='stat warn'><b>"+stock.pipeline+"</b><span>Incoming</span></div>"+
         "</div>";
-      if (short) html += "<div class='short-note'>Sold "+short+" more than has been received — waiting on stock.</div>";
+      if (short){
+        var unowned = state.sales.filter(function(x){ return x.productId===p.id && !x.attributedTo; }).length;
+        var msg = unowned
+          ? "Not counted yet — pick who gets the sale (or who bought it) at the top of Overview and this fills in."
+          : (stock.pipeline > 0
+              ? "Sold "+short+" more than has arrived — waiting on the incoming stock."
+              : "Sold "+short+" with no purchase recorded — tap Add batch if you bought it.");
+        html += "<div class='short-note'>"+msg+"</div>";
+      }
       if (batches.length){
         html += "<div class='batch-list'>";
         batches.forEach(function(b){
@@ -3728,6 +3748,7 @@
       return;
     }
     if (action==="bought-all"){ var bg = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (bg){ var bc = { Jon:0, Jax:0 }; bc[t.dataset.who] = bg.qty; applyPurchase(t.dataset.key, bc); } return; }
+    if (action==="bought-even"){ var be = purchaseGroups().filter(function(x){ return x.key===t.dataset.key; })[0]; if (be) applyPurchase(t.dataset.key, { Jon:Math.ceil(be.qty/2), Jax:Math.floor(be.qty/2) }); return; }
     if (action==="bought-split"){ openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ applyPurchase(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); closeModal(); return; }
     if (action==="assign-owner"){ assignOwner(t.dataset.id, t.dataset.who); return; }
