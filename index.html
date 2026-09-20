@@ -183,14 +183,6 @@
   .btn.small{ padding:5px 10px; font-size:12.5px; }
   .btn.danger{ color:var(--bad); }
   .btn.primary.danger{ background:var(--bad); color:#fff; }
-  .shot-pair img{ cursor:zoom-in; }
-  .lightbox-backdrop{
-    position:fixed; inset:0; background:rgba(0,0,0,.75); z-index:70;
-    display:flex; align-items:center; justify-content:center; padding:32px; cursor:zoom-out;
-  }
-  .lightbox-backdrop img{ max-width:100%; max-height:100%; border-radius:10px; cursor:default; }
-  .lightbox-close{ position:absolute; top:18px; right:18px; background:rgba(255,255,255,.15); color:#fff; }
-  .lightbox-close:hover{ background:rgba(255,255,255,.25); }
 
   .card{ background:var(--surface); border-radius:var(--radius); box-shadow:var(--shadow); }
   .product-card{ margin-bottom:12px; overflow:hidden; }
@@ -198,17 +190,12 @@
   .product-title{ display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; }
   .product-title h3{ font-size:16px; }
   .cat{ font-size:11.5px; letter-spacing:.01em; color:var(--muted); background:var(--surface-2); padding:2px 9px; border-radius:99px; font-weight:600; }
-  .stock-line{ display:flex; gap:16px; font-size:13px; color:var(--muted); flex-wrap:wrap; }
-  .stock-line b{ color:var(--ink); font-weight:600; }
   .card-actions{ display:flex; gap:8px; padding:12px 18px; border-top:1px solid var(--border); }
 
   table{ width:100%; border-collapse:collapse; font-size:13.5px; }
   th{ text-align:left; font-size:11.5px; letter-spacing:.02em; color:var(--muted); font-weight:600; padding:9px 16px; border-bottom:1px solid var(--border); }
   td{ padding:11px 16px; border-bottom:1px solid var(--border); vertical-align:middle; }
   tr:last-child td{ border-bottom:none; }
-  .table-wrap{ overflow-x:auto; }
-  .num-cell{ font-variant-numeric:tabular-nums; }
-  .cell-note{ max-width:200px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 
   .badge{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:99px; white-space:nowrap; }
   .badge.owner-Jon{ background:var(--jon-soft); color:var(--jon); }
@@ -218,12 +205,8 @@
   .badge.status-received{ background:var(--good-soft); color:var(--good); }
   .badge.overdue{ background:var(--bad-soft); color:var(--bad); }
   .badge.review{ background:var(--warn-soft); color:var(--warn); }
-  .owner-cell{ display:flex; flex-direction:column; align-items:flex-start; gap:5px; }
-  .stack-cell{ display:flex; flex-direction:column; align-items:flex-end; gap:4px; }
   .badge.lifecycle-pending{ background:var(--warn-soft); color:var(--warn); }
   .badge.lifecycle-completed{ background:var(--good-soft); color:var(--good); }
-
-  .row-actions{ display:flex; gap:2px; justify-content:flex-end; }
   .empty{ padding:44px 24px; text-align:center; color:var(--muted); font-size:14px; }
   .empty .ic{ display:flex; justify-content:center; color:var(--border); margin-bottom:10px; }
   .empty .ic svg{ width:32px; height:32px; }
@@ -259,69 +242,15 @@
     position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--ink);
     color:var(--bg); padding:10px 18px; border-radius:99px; font-size:13.5px; font-weight:500; z-index:60; box-shadow:0 8px 24px -6px rgba(0,0,0,.3);
   }
-
-  .dropzone{
-    border:1.5px dashed var(--border); border-radius:var(--radius); padding:36px 20px; text-align:center;
-    cursor:pointer; background:var(--surface); margin-bottom:18px;
-  }
-  .dropzone:hover, .dropzone.drag{ border-color:var(--accent); background:var(--accent-soft); }
-  .dropzone .ic{ display:flex; justify-content:center; color:var(--accent); margin-bottom:10px; }
-  .dropzone .ic svg{ width:30px; height:30px; }
-  .dropzone .lead{ font-weight:600; font-size:15px; }
-  .spinner{ width:14px; height:14px; border-radius:50%; border:2px solid currentColor; border-top-color:transparent; animation:spin .7s linear infinite; flex:0 0 auto; }
   @keyframes spin{ to{ transform:rotate(360deg); } }
-  @media (prefers-reduced-motion: reduce){ .spinner{ animation:none; } }
-
-  /* Full-screen import/OCR progress -- deliberately blocking (like a page-load
-     screen), since this covers a fully automatic background sequence with
-     nothing for the user to do but wait; it's driven by the same scanState
-     every scan/upload stage already sets, and lives outside #main so it stays
-     up across a tab switch instead of disappearing when #main re-renders. */
-  .scan-overlay{
-    position:fixed; inset:0; z-index:90; display:flex; align-items:center; justify-content:center;
-    padding:20px; background:rgba(0,0,0,.45); backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
-    animation:scanOverlayIn .2s ease-out;
-  }
+  @media (prefers-reduced-motion: reduce){ }
   @keyframes scanOverlayIn{ from{ opacity:0; } to{ opacity:1; } }
-  .scan-overlay-card{
-    display:flex; flex-direction:column; align-items:center; text-align:center; gap:18px;
-    width:100%; max-width:300px; background:var(--surface); border-radius:20px;
-    padding:38px 30px 32px; box-shadow:0 24px 70px -14px rgba(0,0,0,.45);
-  }
-  .scan-overlay-ring{
-    width:44px; height:44px; border-radius:50%; flex:0 0 auto;
-    border:3.5px solid var(--accent-soft); border-top-color:var(--accent);
-    animation:spin .8s linear infinite;
-  }
-  .scan-overlay-copy{ display:flex; flex-direction:column; gap:7px; }
-  .scan-overlay-label{ font-size:15px; font-weight:600; line-height:1.35; color:var(--ink); }
-  .scan-overlay-sub{ font-size:12.5px; line-height:1.4; color:var(--muted); }
-  .scan-overlay-bar{ width:100%; height:4px; border-radius:99px; background:var(--surface-2); overflow:hidden; }
-  .scan-overlay-bar span{
-    display:block; height:100%; width:35%; border-radius:99px; background:var(--accent);
-    animation:scanOverlayBar 1.15s ease-in-out infinite;
-  }
   @keyframes scanOverlayBar{ 0%{ transform:translateX(-110%); } 100%{ transform:translateX(310%); } }
   @media (prefers-reduced-motion: reduce){
-    .scan-overlay{ animation:none; }
-    .scan-overlay-ring{ animation:none; border-top-color:var(--accent); }
-    .scan-overlay-bar span{ animation:none; width:100%; }
   }
-
-  .order-row{ display:flex; flex-wrap:wrap; gap:8px 12px; align-items:center; padding:13px 16px; border-bottom:1px solid var(--border); }
-  .order-row:last-child{ border-bottom:none; }
-  .order-row-main{ display:flex; gap:12px; align-items:center; flex:1 1 auto; min-width:0; }
-  .order-row-meta{ display:flex; align-items:center; gap:10px; flex:0 0 auto; margin-left:auto; }
-  .order-thumb{ width:48px; height:48px; border-radius:10px; object-fit:cover; flex:0 0 auto; background:var(--surface-2); }
-  .order-main{ flex:1; min-width:0; }
-  .order-buyer{ font-weight:600; }
-  .order-sub{ font-size:12.5px; color:var(--muted); margin-top:1px; }
-  .shot-pair{ display:flex; gap:12px; flex-wrap:wrap; }
-  .shot-pair img{ max-width:220px; border-radius:12px; border:1px solid var(--border); }
   .kv{ display:grid; grid-template-columns:1fr auto; gap:6px 10px; font-size:14px; }
   .kv div:nth-child(odd){ color:var(--muted); }
   .kv div:nth-child(even){ text-align:right; font-weight:500; }
-  .raw-ocr{ white-space:pre-wrap; font-size:11.5px; background:var(--surface-2); border-radius:10px; padding:10px 12px; max-height:160px; overflow-y:auto; margin-top:6px; }
 
   @media (max-width:780px){
     .shell{ flex-direction:column; }
@@ -361,35 +290,6 @@
     .topbar h1{ font-size:24px; }
     .modal{ border-radius:16px 16px 0 0; max-height:92vh; }
     .modal-backdrop{ align-items:flex-end; padding:0; }
-
-    /* Order-row cards (Orders tab "Recently scanned" list): the thumbnail+buyer/item block and
-       the status-badge+View-button block each get the FULL row width instead of squeezing into
-       whatever's left after the other claims space — that squeeze is what forced a long item
-       title to wrap into a narrow, near-single-word-per-line column next to the thumbnail. */
-    .order-row-main{ flex:1 1 100%; }
-    .order-row-meta{ flex:1 1 100%; justify-content:space-between; margin-left:0; padding-left:60px; }
-
-    /* Every data table (Sales log, Payment history, preorder/batch lists) collapses from a
-       fixed-column grid — which has no room to breathe at this width and was forcing long cell
-       text to wrap into a tall, cramped column instead of the row just scrolling or reflowing —
-       into a stack of labeled key/value rows instead. Each <td> already carries a data-label
-       attribute matching its column header (added specifically for this), shown via ::before
-       so the column headers themselves can be hidden without losing that context. */
-    .table-wrap table, .table-wrap tbody, .table-wrap tr{ display:block; width:100%; }
-    .table-wrap thead{ display:none; }
-    .table-wrap tr{ padding:12px 16px; border-bottom:1px solid var(--border); }
-    .table-wrap tr:last-child{ border-bottom:none; }
-    .table-wrap td{
-      display:flex; align-items:flex-start; justify-content:space-between; gap:14px;
-      padding:5px 0; border-bottom:none; text-align:right;
-    }
-    .table-wrap td::before{
-      content:attr(data-label); font-size:11.5px; font-weight:600; color:var(--muted);
-      text-align:left; flex:0 0 auto; padding-top:1px;
-    }
-    .table-wrap td.cell-note{ max-width:none; white-space:normal; overflow:visible; text-overflow:clip; }
-    .table-wrap td .order-sub{ text-align:right; }
-    .table-wrap td .row-actions{ justify-content:flex-end; }
   }
 
   /* ================= Vibrant layer =================
@@ -482,7 +382,6 @@
   .product-title{ align-items:center; gap:13px; }
   .product-title h3{ font-size:18px; font-weight:800; letter-spacing:-.02em; }
   .cat{ background:color-mix(in srgb,var(--tabc) 15%, transparent); color:var(--tabc); font-weight:700; }
-  .stock-line b{ font-family:var(--display); font-size:15px; }
   th{ background:var(--surface-2); color:var(--muted); text-transform:uppercase; letter-spacing:.09em; font-size:10.5px; font-weight:700; }
   tbody tr{ transition:background .12s; }
   tbody tr:hover{ background:color-mix(in srgb,var(--tabc) 6%, transparent); }
@@ -515,23 +414,10 @@
   .chip{ width:46px; height:46px; border-radius:15px; display:inline-flex; align-items:center; justify-content:center; color:#fff;
          font-family:var(--display); font-weight:800; font-size:16px; letter-spacing:-.02em; flex:0 0 auto; box-shadow:0 10px 20px -10px rgba(0,0,0,.45); }
 
-  .import-bar{ display:flex; align-items:center; gap:14px; padding:14px 18px; margin-bottom:6px; border-radius:20px; cursor:pointer; text-align:left;
-               border:2px solid transparent;
-               background:linear-gradient(var(--surface),var(--surface)) padding-box, var(--g-brand) border-box; }
-  .import-bar:hover, .import-bar.drag{ background:linear-gradient(var(--accent-soft),var(--accent-soft)) padding-box, var(--g-brand) border-box; }
-  .import-bar .ic{ width:42px; height:42px; border-radius:14px; background:var(--g-brand); color:#fff; flex:0 0 auto; display:flex; align-items:center; justify-content:center; margin:0; }
-  .import-bar .ic svg{ width:21px; height:21px; }
-  .import-bar .lead{ font-weight:800; font-size:15px; font-family:var(--display); }
-  .import-bar .hint{ margin:2px 0 0; }
-  .import-bar .go{ margin-left:auto; }
-
   .sales-list{ display:flex; flex-direction:column; gap:10px; }
   .sale-row{ display:flex; align-items:center; gap:14px; padding:14px 16px; background:var(--surface); border:1px solid var(--border);
              border-radius:20px; box-shadow:var(--shadow); transition:transform .15s, border-color .15s; }
   .sale-row:hover{ transform:translateY(-2px); border-color:color-mix(in srgb,var(--tabc) 45%, var(--border)); }
-  .sale-thumb{ flex:0 0 auto; width:52px; height:52px; }
-  .sale-thumb img{ width:52px; height:52px; border-radius:15px; object-fit:cover; background:var(--surface-2); }
-  .sale-thumb .chip{ width:52px; height:52px; }
   .sale-main{ flex:1 1 auto; min-width:0; }
   .sale-title{ font-weight:700; font-size:15px; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .sale-sub{ font-size:12.5px; color:var(--muted); margin-top:2px; }
@@ -542,10 +428,6 @@
 
   .modal{ border-radius:26px; box-shadow:0 30px 80px -20px rgba(40,10,120,.55); }
   .modal-head h3{ font-size:19px; font-weight:800; }
-  .scan-overlay-ring{ border-color:var(--accent-soft); border-top-color:#b23cff; }
-  .scan-overlay-bar span{ background:var(--g-brand); }
-  .scan-overlay-card{ border-radius:28px; }
-  .dropzone{ border-radius:20px; }
 
   .bottom-tabbar{ background:color-mix(in srgb,var(--surface) 88%, transparent); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); }
   @media (max-width:780px){
@@ -565,7 +447,6 @@
     .sale-row{ flex-wrap:wrap; }
     .sale-money{ text-align:left; min-width:0; }
     .sale-actions{ flex-direction:row; flex-wrap:wrap; width:100%; justify-content:flex-start; }
-    .import-bar .hint{ display:none; }
   }
   @media (prefers-reduced-motion: reduce){
     .tile, .tile:hover, .sale-row, .sale-row:hover, .btn, .btn:hover, .navbtn, .navbtn:hover{ transition:none; transform:none; }
@@ -582,7 +463,14 @@
   button,input,select,textarea{ font-family:inherit; }
   h1,h2,h3{ font-family:var(--font); }
   .num,.tabular,.tile .value,.sale-profit,.stat b,.pay-amt,.owner-queue-row .amt{ font-variant-numeric:tabular-nums; }
-  .shell,.main,#main,.sale-main,.pre-main,.batch-main,.pt-text,.pay-main,.ib-text{ min-width:0; }
+  .shell,
+  .main,
+  #main,
+  .sale-main,
+  .pre-main,
+  .batch-main,
+  .pt-text,
+  .pay-main{ min-width:0; }
   .main{ max-width:100%; }
   img{ max-width:100%; }
   .sale-title,.pre-title,.product-title h3,.batch-note,.sale-sub{ overflow-wrap:anywhere; }
@@ -651,8 +539,6 @@
   .sales-list{ display:flex; flex-direction:column; gap:10px; }
   .sale-row{ gap:14px; }
   .sale-sub{ font-size:12px; }
-  .import-bar .lead{ font-weight:600; font-size:14px; }
-  .import-bar{ border-radius:22px; }
 
   .modal-backdrop{ overflow-y:auto; }
   .modal{ max-width:min(440px,100%); }
@@ -675,8 +561,6 @@
     .pre-main{ flex:1 1 0; }
     .pre-when{ flex:1 1 100%; flex-direction:row; align-items:center; justify-content:space-between; flex-wrap:wrap; text-align:left; padding-top:10px; border-top:1px dashed var(--border); }
     .pay-row{ padding:12px 14px; }
-    .import-bar{ flex-wrap:wrap; }
-    .import-bar .go{ margin-left:0; width:100%; justify-content:center; }
     .sale-actions{ justify-content:flex-start; border-top:1px dashed var(--border); padding-top:8px; }
     .modal-backdrop{ padding:12px; }
   }
@@ -936,7 +820,6 @@
 
   var OWNERS = ["Jon","Jax"];
   var STATUS_LABEL = { preorder:"Preordered", transit:"In transit", received:"Received" };
-  var CATS = ["Pokémon TCG","Video Games & Consoles","Sports Cards","Other Collectibles"];
   // Shared with submit-edit-batch below: editing a batch that still carries this exact
   // placeholder note clears it automatically, since filling in the real cost IS the
   // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
@@ -946,7 +829,18 @@
   var db = null;
   var tab = "overview";
   var TABS = ["overview","inventory","preorders","sales","settlements"];
-  function tabFromHash(){ var h = (location.hash||"").replace("#",""); return TABS.indexOf(h)>=0 ? h : null; }
+  // "#inventory?cost=<productId>" -> tab + params; Discord alert cards link straight to the fix
+  function parseHash(){
+    var raw = (location.hash||"").replace(/^#/, ""), parts = raw.split("?"), q = {};
+    (parts[1]||"").split("&").forEach(function(kv){
+      if (!kv) return;
+      var p = kv.split("=");
+      try { q[decodeURIComponent(p[0])] = decodeURIComponent(p[1]||""); } catch(e){}
+    });
+    return { tab: parts[0], q: q };
+  }
+  function tabFromHash(){ var h = parseHash().tab; return TABS.indexOf(h)>=0 ? h : null; }
+  var pendingDeepLink = (function(){ var h = parseHash(); return Object.keys(h.q).length ? h : null; })();
   if (tabFromHash()) tab = tabFromHash();
   var salesQ = "", salesFilter = "all", salesShown = 30, invQ = "", invFilter = "all";
   var loaded = { products:false, batches:false, sales:false, settlements:false };
@@ -1069,13 +963,6 @@
     return Promise.resolve();
   }
 
-  function addProduct(data){
-    data = Object.assign({ createdBy: whoAmI, createdAt: Date.now() }, data);
-    return db ? db.collection("products").add(data) : localAdd("products", data);
-  }
-  function updateProduct(id, patch){
-    return db ? db.doc("products/"+id).update(patch) : localUpdate("products", id, patch);
-  }
   function addBatch(data){
     data = Object.assign({ createdBy: whoAmI, createdAt: Date.now() }, data);
     return db ? db.collection("batches").add(data) : localAdd("batches", data);
@@ -1222,7 +1109,6 @@
     return preorderBatches().filter(function(b){ return b.owner===owner; })
       .reduce(function(a,b){ return a + Number(b.quantity||0)*Number(b.unitCost||0); },0);
   }
-  function needsReviewBatches(){ return state.batches.filter(function(b){ return !!b.needsReview; }); }
   function pendingProfit(){ return state.sales.filter(function(s){ return s.lifecycleStatus==="pending"; }).reduce(function(a,s){ return a+Number(s.netProfit||0); },0); }
 
   function suggestOwner(productId){
@@ -1248,8 +1134,10 @@
     if (changed) window.scrollTo(0, 0);
   }
   window.addEventListener("hashchange", function(){
-    var t = tabFromHash();
+    var t = tabFromHash(), h = parseHash();
+    if (Object.keys(h.q).length) pendingDeepLink = h;
     if (t && t !== tab){ tab = t; render(); window.scrollTo(0, 0); }
+    else if (pendingDeepLink) render();
   });
 
   function render(){
@@ -1275,6 +1163,10 @@
     else if (tab==="sales") main.innerHTML = renderSales();
     else if (tab==="settlements") main.innerHTML = renderSettlements();
     paintIcons();
+    if (pendingDeepLink && !isLoading()){
+      var dl = pendingDeepLink; pendingDeepLink = null;
+      setTimeout(function(){ runDeepLink(dl); }, 60);
+    }
     if (keep){
       var si = $("#"+keep.id);
       if (si){ si.focus(); try { si.setSelectionRange(keep.a, keep.b); } catch(e){} }
@@ -1854,6 +1746,26 @@
   }
   // "Add cost" on one item: the same full form as a store trip (price before tax, quantity, order
   // total, other items, tax spread, who), just for this item, prefilled from what was logged before
+  function openOwnerPick(saleId){
+    var sa = state.sales.find(function(x){ return x.id===saleId; });
+    if (!sa){ toast("That sale is no longer in the ledger"); return; }
+    if (sa.attributedTo){ toast("That sale already goes to "+sa.attributedTo); return; }
+    openModal("Who gets this sale?",
+      "<div class='confirm-list'>"+ownerConfirmRows([saleId])+"</div><div class='hint'>Pick the person it goes to. You confirm on the next screen.</div>",
+      "<button class='btn' data-action='close-modal'>Cancel</button>"+
+      "<button class='btn primary' data-action='assign-owner' data-who='Jon' data-id='"+sa.id+"'>Jon</button>"+
+      "<button class='btn primary' data-action='assign-owner' data-who='Jax' data-id='"+sa.id+"'>Jax</button>");
+  }
+  function runDeepLink(d){
+    try { history.replaceState(null, "", "#"+(tabFromHash() || tab)); } catch(e){}
+    var q = d.q || {};
+    if (q.owner){ openOwnerPick(q.owner); return; }
+    if (q.cost){
+      var p = productById(q.cost);
+      if (!p){ toast("That item is no longer in the ledger"); return; }
+      openItemTrip(nameKey(p.name)); return;
+    }
+  }
   function openItemTrip(key){
     var r = unpricedForKey(key), g = r.g;
     if (!g) return;
@@ -2325,12 +2237,6 @@
     );
   }
 
-  // other batches of the same product (any listing) owned by the same person
-  function siblingBatches(b){
-    var pr = productById(b.productId);
-    var pids = pr ? pidsForKey(nameKey(pr.name)) : [b.productId];
-    return state.batches.filter(function(x){ return x.id!==b.id && x.owner===b.owner && pids.indexOf(x.productId)!==-1; });
-  }
   function openEditBatchModal(id){
     var b = state.batches.find(function(x){ return x.id===id; });
     if(!b) return;
@@ -2715,7 +2621,7 @@
   async function boot(){
     try {
       if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-      var cred = await firebase.auth().signInAnonymously();
+      await firebase.auth().signInAnonymously();
       db = firebase.firestore();
       subscribeCollections();
     } catch(e){
