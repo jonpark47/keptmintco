@@ -872,6 +872,23 @@
   .trip-list[data-only]:not([data-only='']) .trip-chk{ display:none; }
   .trip-list[data-only]:not([data-only='']){ max-height:none; margin-top:0; }
   .warn-line{ color:var(--accent) !important; font-weight:600 !important; margin-top:3px; }
+
+  /* ===== mobile hardening: nothing wider than its box, nothing scrolls sideways ===== */
+  html, body{ max-width:100%; overflow-x:clip; overscroll-behavior-x:none; }
+  @media (pointer: coarse), (max-width: 820px){ html, body{ touch-action:pan-y pinch-zoom; } }
+  .modal, .modal-body, .trip-list, .confirm-list, .owner-queue-list, .batch-list, .sales-list, .pre-list, .pay-list, .cost-list{ overflow-x:hidden; }
+  .card, .tile, .sale-row, .pre-card, .pay-row, .owner-queue-row, .confirm-row, .batch-row, .trip-row, .stk-row, .dash-card, .row2 > *{ min-width:0; max-width:100%; }
+  .what, .what > span, .sale-main, .sale-title, .sale-sub, .pre-main, .pre-title, .pt-text, .pt-text h3, .trip-name, .confirm-row > span, .cost-list span, .cs-text, .batch-main, .batch-note, .stk-name, .short-note, .hint, .modal-head h3{ min-width:0; overflow-wrap:anywhere; }
+  .owner-queue-row .what span{ white-space:normal; overflow:visible; text-overflow:clip; }
+  .sale-sub{ white-space:normal; }
+  .field input, .field select, .field textarea{ min-width:0; max-width:100%; box-sizing:border-box; width:100%; }
+  /* numbers scale to the tile they sit in instead of spilling out of it */
+  .tile{ container-type:inline-size; }
+  .tile .value{ white-space:nowrap; font-size:clamp(15px, 15.5cqw, 42px); }
+  .tiles.mini .tile .value{ font-size:clamp(14px, 15cqw, 29px); }
+  .tile.tone-owe .value, .tile.tone-owed .value, .tile.tone-even .value{ white-space:normal; overflow-wrap:anywhere; font-size:clamp(18px, 8.5cqw, 30px); line-height:1.15; }
+  .confirm-row .badge, .owner-queue-row .badge, .sale-tags .badge, .sale-tags .cost-badge{ flex:0 0 auto; white-space:nowrap; }
+  .confirm-row{ gap:10px; }
 </style>
 </head>
 <body data-tab="overview">
