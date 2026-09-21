@@ -793,8 +793,10 @@
   .confirm-row .badge, .owner-queue-row .badge, .sale-tags .badge, .sale-tags .cost-badge{ flex:0 0 auto; white-space:nowrap; }
   .confirm-row{ gap:10px; }
 
-  .sale-row.cancelled{ opacity:.62; }
-  .sale-row.cancelled .sale-profit{ text-decoration:line-through; }
+  .badge.cancel-red{ background:var(--bad-soft); color:var(--bad); font-weight:700; }
+  .badge.ok-pill{ background:var(--good-soft); color:var(--good); }
+  .sale-row.cancelled{ opacity:.8; }
+  .sale-row.cancelled .sale-profit{ text-decoration:line-through; color:var(--muted); }
 
   .head-actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
   .head-actions .btn .ic{ width:16px; height:16px; }
@@ -2300,11 +2302,17 @@
   // "Sales" (the table) is the same record, so it lives in one place.
   function cancelledRow(s){
     var p = productById(s.productId), name = p ? p.name : "Unknown item";
+    var net = s.cancelNet, netPill = "";
+    if (net!=null){
+      netPill = Math.abs(net) < 0.005
+        ? "<span class='badge ok-pill' title='eBay refunded the buyer in full and gave back every fee'>Refunded in full, no fees kept</span>"
+        : "<span class='badge cancel-red' title='what eBay recorded for this order added up to this'>"+(net<0 ? "Lost " : "Kept ")+money(Math.abs(net))+"</span>";
+    }
     return "<div class='sale-row cancelled'>"+prodThumb(p, name)+
       "<div class='sale-main'><div class='sale-title'>"+esc(name)+"</div>"+
-        "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+"</div>"+
-        "<div class='sale-tags'><span class='badge label-note'>Cancelled or refunded</span><span class='badge label-note'>Not in any totals</span></div></div>"+
-      "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div></div>"+
+        "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+"</div>"+
+        "<div class='sale-tags'><span class='badge cancel-red'>Cancelled</span>"+netPill+"<span class='badge qty'>Not in any totals</span></div></div>"+
+      "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>was the payout</div></div>"+
       "<div class='sale-actions'><button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button></div></div>";
   }
   function saleRow(s){
@@ -2342,7 +2350,7 @@
   function renderSales(){
     var live = state.sales.slice().sort(bySaleNewest);
     var canc = (state.cancelled || []).slice().sort(bySaleNewest);
-    var rows = salesFilter === "cancelled" ? canc : live;
+    var rows = salesFilter === "cancelled" ? canc : (salesFilter === "all" ? live.concat(canc).sort(bySaleNewest) : live);   // cancelled ones show in the main list too, in red
     var total = totalNetProfit(), pending = pendingProfit();
     var html = "<div class='tiles mini'>"+
       "<div class='tile t-profit'><div class='eyebrow'>Total payout</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
@@ -2352,7 +2360,7 @@
     html += "<div class='section-head'><h2>All sales</h2><span class='head-actions'><button class='btn' data-action='export-sales' aria-label='Export sales as a spreadsheet'><span class='ic' data-icon='download'></span> Export</button>"+
       "<button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></span></div>";
     if (!live.length && !canc.length){ return html + "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>"; }
-    var counts = { all:live.length, pending:0, paid:0, unassigned:0, nocost:0, cancelled:canc.length, Jon:0, Jax:0 };
+    var counts = { all:live.length + canc.length, pending:0, paid:0, unassigned:0, nocost:0, cancelled:canc.length, Jon:0, Jax:0 };
     live.forEach(function(sa){
       if (saleProfit(sa)==null) counts.nocost++;
       if (sa.lifecycleStatus==="pending") counts.pending++;

@@ -1,0 +1,12 @@
+390 px, rows in the main list: 4 | cancelled rows: 3
+  red Cancelled badges: 3
+  net notes: ['Cancelled Refunded in full, no fees kept Not in any totals', 'Cancelled Lost $6.99 Not in any totals', 'Cancelled Not in any totals']
+  chip All count: All4
+  totals unchanged by cancelled ones: TOTAL PAYOUT | $80.00 | 1 sale
+  no sideways scroll: True | errors: []
+320 px, rows in the main list: 4 | cancelled rows: 3
+  red Cancelled badges: 3
+  net notes: ['Cancelled Refunded in full, no fees kept Not in any totals', 'Cancelled Lost $6.99 Not in any totals', 'Cancelled Not in any totals']
+  chip All count: All4
+  totals unchanged by cancelled ones: TOTAL PAYOUT | $80.00 | 1 sale
+  no sideways scroll: True | errors: []
