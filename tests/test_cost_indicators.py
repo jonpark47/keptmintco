@@ -16,7 +16,7 @@ try:
         errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
         pg.goto("http://localhost:8788/_v16_copy.html"); pg.wait_for_timeout(1800)
         pg.evaluate("(d) => { const S = window.__t.state(); ['products','batches','sales','settlements'].forEach(k => { S[k] = d[k]; }); window.__t.render(); }", data)
-        for tab in ("overview", "inventory", "preorders", "sales"):
+        for tab in ("overview", "inventory", "sales"):
             pg.evaluate(f"window.__t.setTab('{tab}')"); pg.wait_for_timeout(350)
             print(tab, "| cost pills:", pg.locator(".cost-badge").count(), "| strips:", pg.locator(".cost-strip").count())
         pg.evaluate("window.__t.setTab('sales')"); pg.wait_for_timeout(300)

@@ -17,7 +17,7 @@ try:
         pg.goto("http://localhost:8790/_v18_copy.html"); pg.wait_for_timeout(1800)
         pg.evaluate("(d) => { const S = window.__t.state(); ['products','batches','sales','settlements'].forEach(k => { S[k] = d[k]; }); window.__t.render(); }", data)
         miss = pg.evaluate("window.__t.state().products.length")
-        for tab in ("overview", "sales", "preorders", "settlements", "inventory"):
+        for tab in ("overview", "sales", "settlements", "inventory"):
             pg.evaluate(f"window.__t.setTab('{tab}')"); pg.wait_for_timeout(300)
             print(tab, "| review banner:", pg.inner_text("#reviewBanner").replace("\n"," ")[:80] if pg.locator("#reviewBanner .banner").count() else "-")
         pg.evaluate("window.__t.setTab('sales')"); pg.wait_for_timeout(300)

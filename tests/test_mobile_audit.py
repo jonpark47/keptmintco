@@ -75,7 +75,7 @@ try:
             pg.goto("http://localhost:8801/_m_copy.html"); pg.wait_for_timeout(1500)
             pg.evaluate("(d) => { const S = window.__t.state(); ['products','batches','sales','settlements'].forEach(k => { S[k] = d[k]; }); window.__t.render(); }", data)
             cdp = ctx.new_cdp_session(pg)
-            for tab in ("overview", "inventory", "preorders", "sales", "settlements"):
+            for tab in ("overview", "inventory", "insights", "sales", "settlements"):
                 pg.evaluate("t => window.__t.setTab(t)", tab); pg.wait_for_timeout(300)
                 for yy in (150, 300, 450, 600):
                     for x0, x1 in ((w - 30, 30), (30, w - 30)):
