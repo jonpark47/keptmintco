@@ -1341,9 +1341,7 @@
     var perUnit = function(s){ return Number(s.netProfit||0) / Math.max(Number(s.quantitySold||1), 1); };
     sales.filter(isAuto).sort(function(a,b){ return perUnit(b)-perUnit(a); }).forEach(function(s){
       var q = Number(s.quantitySold||1), owner = null;
-      if (units.Jax===0) owner = "Jon";
-      else if (units.Jon===0) owner = "Jax";
-      else if (left.Jon >= q) owner = "Jon";
+      if (left.Jon >= q) owner = "Jon";
       else if (left.Jax >= q) owner = "Jax";
       else if (left.Jon>0 || left.Jax>0) owner = left.Jon >= left.Jax ? "Jon" : "Jax"; // an order can't be split: whoever has more units left takes it
       if (owner) left[owner] -= q;

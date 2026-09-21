@@ -1,0 +1,3 @@
+random ledgers checked: 300
+ledgers where the app and the reference disagree: 0
+errors: []

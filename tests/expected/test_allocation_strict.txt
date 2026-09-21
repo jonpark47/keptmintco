@@ -1,0 +1,5 @@
+Jon bought 3, Jax 0, four sales: ['Jon', 'Jon', 'Jon', None]
+Jon 2, Jax 2, four sales: ['Jon', 'Jon', 'Jax', 'Jax']
+Jon 0, Jax 2, four sales: ['Jax', 'Jax', None, None]
+Jon 1, Jax 1, a 2-unit order: ['Jon']
+errors: []
