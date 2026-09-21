@@ -1,0 +1,11 @@
+accented names group by their letters (Pokémon keeps its é): True
+controls shown for 3 items: ['Search: mew 152/128 | Change search | Stop tracking', 'Market price: not tracked yet | Start tracking', 'Market price: not tracking | Start tracking']
+start form: Start tracking | prefilled search: zoro sanji
+working note: True
+rows after the answer: ['Search: mew 152/128 | Change search | Stop tracking', 'Market price: not tracked yet | Start tracking', 'Market price: not tracking | Start tracking']
+request sent: [('search', 'zoro sanji card', 'new')]
+answer shown: Tracking with `zoro sanji`: 31 listings found. | working note gone: True
+stop request: stop
+change form: Change search | current search: mew 152/128
+too short refused: True | still one request per action: 2
+no sideways scroll: True | errors: []

@@ -1,0 +1,45 @@
+import re, subprocess, time, pathlib, sys, json
+from playwright.sync_api import sync_playwright
+HERE = pathlib.Path(__file__).resolve().parent
+root = HERE.parent
+data = json.loads((HERE / "fixture.json").read_text(encoding="utf-8"))
+html = (root / "index.html").read_text(encoding="utf-8")
+html = re.sub(r"var firebaseConfig = \{[\s\S]*?\n  \};", 'var firebaseConfig = {apiKey:"invalid",authDomain:"invalid.firebaseapp.com",projectId:"invalid-offline-test"};', html)
+html = html.replace("boot();", "window.__t={state:function(){return state;},setTab:setTab,render:render,setDb:function(x){db=x;},loaded:loaded,nameKey:nameKey}; boot();", 1)
+(root / "_mh_copy.html").write_text(html, encoding="utf-8")
+srv = subprocess.Popen([sys.executable, "-m", "http.server", "8825", "--directory", str(root)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL); time.sleep(1.5)
+try:
+    with sync_playwright() as p:
+        b = p.chromium.launch()
+        pg = b.new_page(viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True)
+        errs = []; pg.on("pageerror", lambda e: errs.append(str(e)))
+        pg.goto("http://localhost:8825/_mh_copy.html#insights"); pg.wait_for_timeout(1500)
+        pg.evaluate("(d) => { const S = window.__t.state(); ['products','batches','sales','settlements'].forEach(k => { S[k] = d[k]; }); S.sales.forEach(s => { if(!s.attributedTo) s.attributedTo='Jon'; }); window.__t.render(); }", data)
+        names = pg.locator(".ins-name").all_inner_texts()
+        key = lambda n: pg.evaluate("(n) => window.__t.nameKey(n)", n)
+        print("accented names group by their letters (Pokémon keeps its é):", key("Pokémon Mew ex") == "pokémonmewex")
+        pg.evaluate("""(k) => { const S = window.__t.state(); S.marketState = {}; S.marketState[k[0]] = {name:'Tracked item', q:'mew 152/128', status:'tracking'}; S.marketState[k[1]] = {name:'New item', q:'zoro sanji', status:'new'}; S.marketState[k[2]] = {name:'Skipped item', q:'playmat', status:'skipped'}; window.__t.render(); }""", [key(names[0]), key(names[1]), key(names[2])])
+        pg.wait_for_timeout(200)
+        rows = pg.locator(".ins-market-actions")
+        print("controls shown for", rows.count(), "items:", [r.replace("\n", " | ") for r in rows.all_inner_texts()])
+        # fake database: records the request and answers it like the server does
+        pg.evaluate("""() => { window.__sent = []; const fake = { collection: function(name){ return { add: function(doc){ window.__sent.push(doc); return Promise.resolve({ onSnapshot: function(cb){ setTimeout(function(){ cb({ data: function(){ return { status:'done', message:'Tracking with `zoro sanji`: 31 listings found.' }; } }); }, 900); return function(){}; } }); } }; } }; window.__t.setDb(fake); Object.keys(window.__t.loaded).forEach(function(k){ window.__t.loaded[k] = true; }); window.__t.render(); }""")
+        pg.click(".ins-market-actions button[data-start='1']"); pg.wait_for_timeout(250)
+        print("start form:", pg.inner_text(".modal-head h3").strip(), "| prefilled search:", pg.input_value("#f_msearch"))
+        pg.fill("#f_msearch", "  zoro   sanji card "); pg.click("button[data-action='market-submit']"); pg.wait_for_timeout(120)
+        print("working note:", "Searching eBay now" in pg.inner_text("#main"))
+        pg.wait_for_timeout(1100)
+        print("rows after the answer:", [r.replace(chr(10), " | ") for r in pg.locator(".ins-market-actions").all_inner_texts()])
+        sent = pg.evaluate("window.__sent")
+        print("request sent:", [(x["action"], x["query"], x["status"]) for x in sent])
+        print("answer shown:", pg.inner_text("#toastRoot").replace("\n", " ")[:80], "| working note gone:", "Searching eBay now" not in pg.inner_text("#main"))
+        pg.click(".ins-market-actions button[data-action='market-stop']"); pg.wait_for_timeout(700)
+        print("stop request:", pg.evaluate("window.__sent")[-1]["action"])
+        pg.click(".ins-market-actions button[data-action='market-search']:not([data-start])"); pg.wait_for_timeout(250)
+        print("change form:", pg.inner_text(".modal-head h3").strip(), "| current search:", pg.input_value("#f_msearch"))
+        pg.fill("#f_msearch", "ab"); pg.click("button[data-action='market-submit']"); pg.wait_for_timeout(150)
+        print("too short refused:", "at least a few words" in pg.inner_text("#toastRoot"), "| still one request per action:", len(pg.evaluate("window.__sent")))
+        print("no sideways scroll:", pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "| errors:", errs)
+        b.close()
+finally:
+    srv.terminate(); (root / "_mh_copy.html").unlink(missing_ok=True)

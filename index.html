@@ -690,6 +690,9 @@
   .ins-facts span{ white-space:nowrap; }
   .ins-market{ display:flex; flex-direction:column; gap:3px; padding-top:8px; border-top:1px solid var(--border); font-size:13px; }
   .ins-market b{ font-variant-numeric:tabular-nums; }
+  .ins-market-actions{ display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 10px; padding-top:8px; border-top:1px solid var(--border); }
+  .ins-market-actions .sale-sub{ min-width:0; overflow-wrap:anywhere; }
+  .ins-market-actions .ma-btns{ display:flex; gap:6px; flex-wrap:wrap; }
   .ins-bar{ height:6px; border-radius:3px; background:var(--surface-2); overflow:hidden; }
   .ins-bar i{ display:block; height:100%; background:var(--tabc, #6a45ff); }
   .stk-row{ display:flex; flex-direction:column; gap:5px; }
@@ -852,7 +855,7 @@
   // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
   var AUTO_BATCH_NOTE = "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.";
 
-  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [], market: {}, books: null };
+  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [], market: {}, marketState: {}, books: null };
   var memoStore = null;
   var db = null;
   var tab = "overview";
@@ -999,6 +1002,7 @@
     sub("sales","sales");
     sub("settlements","settlements");
     sub("expenses","expenses");
+    db.collection("meta").doc("marketstate").onSnapshot(function(d){ state.marketState = d.exists ? d.data() : {}; scheduleRender(); }, function(){});
     db.collection("meta").doc("books").onSnapshot(function(d){ state.books = d.exists ? d.data() : null; paintBooksPill(); }, function(){});
     db.collection("meta").doc("market").onSnapshot(function(d){ state.market = d.exists ? d.data() : {}; scheduleRender(); }, function(){});
     db.collection("meta").doc("ebay").onSnapshot(function(d){ syncMeta = d.exists ? d.data() : null; paintSyncPill(); }, function(){});
@@ -1261,7 +1265,7 @@
   // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
   var lastPurchaseUndo = null, pendingBought = null, pendingTrip = null, lastTripUndo = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
-  function nameKey(name){ return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  function nameKey(name){ return String(name || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); }   // same rule as the server: letters and digits of any language
   // Which items are "the same product"? Identical titles always are. A relisted item with an edited title is only
   // treated as the same once somebody confirmed it (a Discord card asks): the confirmed product carries `sameAs`
   // pointing at the one it matches, and everything (stock, cost, profit) then counts them as one.
@@ -1674,6 +1678,41 @@
       "<div class='sale-sub'>sold "+n(m.units1, m.tracked1)+" today · "+n(m.units7, m.tracked7)+" this week · "+n(m.units30, m.tracked30)+" this month"+
       (m.supply ? " · "+m.supply+" listed" : "")+(m.at ? " · updated "+relTime(m.at) : "")+"</div></div>";
   }
+  // Where tracking lives: every item on the Insights page says whether its market price is tracked, and you can start it, change the
+  // search words, or stop it. The server (keptmint-live) does the work when it sees the request and answers on the same document.
+  var marketBusy = {};
+  function marketControlsHtml(r){
+    var ms = state.marketState && state.marketState[r.key];
+    if (!ms) return "";
+    var key = esc(r.key);
+    if (marketBusy[r.key]) return "<div class='ins-market'><div class='sale-sub'>Searching eBay now, about 20 seconds…</div></div>";
+    if (ms.status==="tracking")
+      return "<div class='ins-market-actions'><span class='sale-sub'>Search: "+esc(ms.q)+"</span><span class='ma-btns'><button class='btn small ghost' data-action='market-search' data-key='"+key+"'>Change search</button>"+
+             "<button class='btn small ghost' data-action='market-stop' data-key='"+key+"'>Stop tracking</button></span></div>";
+    return "<div class='ins-market-actions'><span class='sale-sub'>Market price: "+(ms.status==="skipped" ? "not tracking" : "not tracked yet")+"</span><span class='ma-btns'><button class='btn small primary' data-action='market-search' data-key='"+key+"' data-start='1'>Start tracking</button></span></div>";
+  }
+  function requestMarket(key, action, query){
+    var ms = (state.marketState||{})[key] || {};
+    if (!db){ toast("Tracking needs the live connection."); return; }
+    marketBusy[key] = true; render();
+    db.collection("marketRequests").add({ group:key, name:ms.name||"", action:action, query:query||"", status:"new", by:whoAmI, at:Date.now() }).then(function(ref){
+      var un = ref.onSnapshot(function(d){
+        var x = d.data();
+        if (x && (x.status==="done" || x.status==="error")){
+          marketBusy[key] = false; toast(x.message || (x.status==="done" ? "Done" : "That did not work")); if (un) un(); render();
+        }
+      });
+    }, function(){ marketBusy[key] = false; toast("Could not send that. Check the connection and try again."); render(); });
+  }
+  function openMarketSearch(key, start){
+    var ms = (state.marketState||{})[key]; if (!ms) return;
+    openModal(start ? "Start tracking" : "Change search",
+      "<div class='sale-sub' style='margin-bottom:8px'>"+esc(ms.name)+"</div>"+
+      "<div class='field'><label for='f_msearch'>Search words</label><input id='f_msearch' type='text' maxlength='100' value='"+esc(ms.q)+"' autocomplete='off'>"+
+      "<div class='hint'>Type what you would type on eBay, like <b>mew 152/128</b>. Every word must be in a listing's title. It starts searching as soon as you save.</div></div>"+
+      "<input type='hidden' id='f_mkey' value='"+esc(key)+"'>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='market-submit' data-start='"+(start?1:0)+"'>"+(start?"Start tracking":"Save and search")+"</button>");
+  }
   function pct(v){ return v==null ? "—" : (v>=0?"+":"")+Math.round(v*100)+"%"; }
   function renderInsights(){
     var rows = insightRows();
@@ -1701,7 +1740,7 @@
         "<div class='ins-profit"+(neg?" neg":"")+"'>"+(known ? money(r.profit)+"<small>"+pct(r.roi)+" return</small>" : "<small>add cost</small>")+"</div></div>"+
         "<div class='ins-facts'><span>"+r.sold+" sold</span>"+(r.avgPayout!=null?"<span>avg payout "+money(r.avgPayout)+"</span>":"")+(r.avgCost!=null?"<span>avg cost "+money(r.avgCost)+"</span>":"")+
         "</div>"+
-        marketHtml(r)+
+        marketHtml(r)+marketControlsHtml(r)+
         (known && share<100 ? "<div class='ins-bar' title='share of sold units that have a cost'><i style='width:"+share+"%'></i></div><div class='sale-sub'>"+r.costedQty+" of "+r.sold+" sold units have a cost</div>" : "")+
         "</div>";
     }).join("")+"</div>";
@@ -2613,6 +2652,13 @@
     if (action==="undo-owner"){ undoOwner(); var tq = t.closest(".toast"); if (tq) tq.remove(); return; }
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-sales") return setTab("sales");
+    if (action==="market-search") return openMarketSearch(t.dataset.key, t.dataset.start==="1");
+    if (action==="market-stop"){ requestMarket(t.dataset.key, "stop", ""); return; }
+    if (action==="market-submit"){
+      var mq = ($("#f_msearch").value||"").replace(/\s+/g," ").trim();
+      if (mq.length < 3){ toast("Type at least a few words to search for."); return; }
+      var mk = $("#f_mkey").value; closeModal(); requestMarket(mk, "search", mq); return;
+    }
     if (action==="books-open") return openBooks();
     if (action==="goto-insights") return setTab("insights");
     if (action==="sale-breakdown") return openBreakdown(t.dataset.id);
