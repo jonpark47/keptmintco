@@ -1615,7 +1615,7 @@
     return t.charAt(0).toUpperCase() + t.slice(1);
   }
   function chargesCardHtml(){
-    var ex = state.expenses || [];
+    var ex = (state.expenses || []).filter(function(x){ return !(x.orderId && state.sales.some(function(sa){ return sa.orderNumber===x.orderId; })); });
     if (!ex.length) return "";
     var now = new Date(), ym = now.getFullYear()+"-"+("0"+(now.getMonth()+1)).slice(-2), total = 0, month = 0;
     ex.forEach(function(x){ var a = Number(x.amount||0); total += a; if (String(x.date||"").slice(0,7)===ym) month += a; });
@@ -2260,7 +2260,7 @@
       "<div class='sale-main'>"+
         "<div class='sale-title'>"+esc(name)+"</div>"+
         "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
-        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(s.orderState==="cancel_requested" ? "<span class='badge label-note'>Cancel requested</span>" : "")+(saleProfit(s)==null ? costPill() : (saleProfit(s) < 0 ? "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Loss, check the cost</span>" : ""))+"</div>"+
+        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(s.orderState==="cancel_requested" ? "<span class='badge label-note'>Cancel requested</span>" : "")+(Number(s.adFees)>0.004 ? "<span class='badge label-note' title='Promoted-listing fee eBay charged on this sale. It is already taken out of the payout.'>Ad fee "+money(s.adFees)+"</span>" : "")+(saleProfit(s)==null ? costPill() : (saleProfit(s) < 0 ? "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Loss, check the cost</span>" : ""))+"</div>"+
       "</div>"+
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+

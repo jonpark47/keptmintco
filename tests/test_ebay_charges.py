@@ -26,6 +26,11 @@ try:
             pg.wait_for_timeout(200)
             print(w, "px, card:", pg.inner_text(".section-head:has-text('eBay charges')").replace("\n", " | "))
             print("  rows:", [re.sub(r"[A-Z][a-z]{2} \d+, \d{4}", "DATE", r.replace("\n", " ")) for r in pg.locator(".confirm-row").all_inner_texts()])
+            pg.evaluate("""() => { const S = window.__t.state(); S.sales[0].orderNumber = 'O1'; S.sales[0].adFees = 3.5;
+              S.expenses.push({id:'e4',kind:'NON_SALE_CHARGE',feeType:'AD_FEE',amount:-3.5,date:'2026-09-06',orderId:'O1',createdAt:9}); window.__t.render(); }""")
+            print("  charge tied to a sale is not repeated in the card:", not any("3.50" in r for r in pg.locator(".confirm-row").all_inner_texts()))
+            pg.evaluate("window.__t.setTab('sales')"); pg.wait_for_timeout(200)
+            print("  sale card shows its ad fee:", "Ad fee $3.50" in pg.inner_text("#main"))
             print("  no sideways scroll:", pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
             print("  errors:", errs)
             pg.close()

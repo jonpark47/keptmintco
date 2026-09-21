@@ -1,10 +1,14 @@
 390 px, no charges -> card hidden: True
 390 px, card: eBay charges | this month -$3.15 · all time -$8.10
   rows: ['Credit DATE · ad fee credit with a very long explanation that must wrap instead of pushing the page sideways $1.10', 'Promoted listings DATE -$4.25', 'Subscription fee DATE -$4.95']
+  charge tied to a sale is not repeated in the card: True
+  sale card shows its ad fee: True
   no sideways scroll: True
   errors: []
 320 px, no charges -> card hidden: True
 320 px, card: eBay charges | this month -$3.15 · all time -$8.10
   rows: ['Credit DATE · ad fee credit with a very long explanation that must wrap instead of pushing the page sideways $1.10', 'Promoted listings DATE -$4.25', 'Subscription fee DATE -$4.95']
+  charge tied to a sale is not repeated in the card: True
+  sale card shows its ad fee: True
   no sideways scroll: True
   errors: []
