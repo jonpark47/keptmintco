@@ -810,7 +810,7 @@
     <div class="brand"><span class="mark"><span class="ic" data-icon="logo"></span></span> KeptMintCo</div>
     <div class="navtabs">
       <button class="navbtn" data-tab="overview"><span class="ic" data-icon="overview"></span> Overview</button>
-      <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span> Items</button>
+      <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span> Costs</button>
       <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span> Sales</button>
       <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span> Settlements</button>
     </div>
@@ -818,7 +818,7 @@
   </nav>
   <nav class="bottom-tabbar">
     <button class="navbtn" data-tab="overview"><span class="ic" data-icon="overview"></span><span>Overview</span></button>
-    <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span><span>Items</span></button>
+    <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span><span>Costs</span></button>
     <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span><span>Sales</span></button>
     <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span><span>Settlements</span></button>
   </nav>
@@ -1196,7 +1196,7 @@
       b.classList.toggle("active", on);
       if (on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");
     });
-    var titles = { overview:"Overview", inventory:"Items", sales:"Sales", settlements:"Settlements", insights:"Insights" };
+    var titles = { overview:"Overview", inventory:"Costs", sales:"Sales", settlements:"Settlements", insights:"Insights" };
     $("#pageTitle").innerHTML = "<h1>"+titles[tab]+"</h1>";
     renderReviewBanner();
     renderOwnerBanner();
@@ -1228,7 +1228,7 @@
     var miss = (isLoading() || !state.products.length || tab==="overview" || tab==="inventory") ? [] : missingCostGroups();
     if (!miss.length){ b.innerHTML=""; return; }
     b.innerHTML = "<div class='banner'><span class='ic' data-icon='coin'></span><span>"+miss.length+" item"+(miss.length>1?"s":"")+" still need"+(miss.length>1?"":"s")+" a purchase price so profit can be tracked.</span>"+
-      "<button data-action='goto-costs'>Review in Items</button></div>";
+      "<button data-action='goto-costs'>Review in Costs</button></div>";
   }
 
   // ---- who bought it / who gets each sale ----
@@ -1833,7 +1833,7 @@
     box.innerHTML = "<div class='owner-queue'><div class='owner-queue-head'><span><span class='oq-badge'>Needs you</span><b>"+miss.length+" item"+(miss.length>1?"s":"")+" need"+(miss.length>1?"":"s")+" a purchase price</b><span class='oq-note'>Add what you paid so your profit can be tracked.</span></span>"+
       "<span><button class='btn small primary' data-action='cost-all'>Add all "+miss.length+"</button></span></div>"+
       "<div class='owner-queue-list'>"+rows+"</div>"+
-      (miss.length>4 ? "<button type='button' class='linkbtn' data-action='goto-costs'>See all "+miss.length+" in Items</button>" : "")+"</div>";
+      (miss.length>4 ? "<button type='button' class='linkbtn' data-action='goto-costs'>See all "+miss.length+" in Costs</button>" : "")+"</div>";
     paintIcons(box);
   }
   function costCardHtml(){
@@ -2107,7 +2107,12 @@
     // listing title and later orders for the same listing keep matching cleanly.
     // Separate eBay listings of the same product are shown as one card (stock and batches
     // combined, split per person); the data underneath is untouched.
-    var plist = productGroupList();
+    // an old listing whose order was cancelled and that was then sold under a new listing has nothing left to show here
+    // (its purchase price belonged to the cancelled sale), so it is not listed; items bought but never sold still are
+    var liveP = {}, cancP = {};
+    state.sales.forEach(function(x){ liveP[x.productId] = 1; });
+    (state.cancelled||[]).forEach(function(x){ cancP[x.productId] = 1; });
+    var plist = productGroupList().filter(function(g){ return g.pids.some(function(id){ return liveP[id]; }) || !g.pids.some(function(id){ return cancP[id]; }); });
     var totalItems = plist.length;
     var missingN = plist.filter(function(g){ return groupCost(g).missing; }).length;
     if (invQ.trim()) plist = plist.filter(function(g){ return matchesQuery(g.p.name, invQ); });

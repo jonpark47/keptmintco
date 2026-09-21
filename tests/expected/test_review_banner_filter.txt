@@ -1,6 +1,6 @@
 overview | review banner: -
-sales | review banner: 8 items still need a purchase price so profit can be tracked. Review in Items
-settlements | review banner: 8 items still need a purchase price so profit can be tracked. Review in Items
+sales | review banner: 8 items still need a purchase price so profit can be tracked. Review in Costs
+settlements | review banner: 8 items still need a purchase price so profit can be tracked. Review in Costs
 inventory | review banner: -
 after click -> tab: inventory | header: 8 of 13 | cards: 8 | all show strip: True | chip on: Missing cost8
 panel 'See all' -> tab: inventory | cards: 8

@@ -1,0 +1,5 @@
+nav tabs: ['Overview', 'Costs\n1', 'Sales', 'Settlements'] | page title: Costs
+items listed: ['3x Zoro Sanji Nami Robin bundle (new listing, sold)', 'Bought in store, not sold yet', 'Relisted after a cancel, still sold once']
+old cancelled single listings hidden: True
+bought-in-store item still shown: True | relisted-and-still-sold shown: True | new bundle shown: True
+errors: []
