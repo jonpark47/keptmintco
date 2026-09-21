@@ -30,7 +30,7 @@ try:
         pg.evaluate("window.__t.setTab('sales')"); pg.wait_for_timeout(400)
         tiles = pg.locator(".tiles.mini .tile .value").all_inner_texts()
         check("cancelled: $999 sale is NOT in the total payout", tiles[0].replace(",", "") == "${:.2f}".format(base_total), tiles)
-        check("cancelled: hidden from the All list", pg.locator(".sale-row.cancelled").count() == 0)
+        check("cancelled: shown in the All list too, marked with a red Cancelled badge", pg.locator(".sale-row.cancelled").count() == 1 and pg.locator(".sale-row.cancelled .badge.cancel-red").count() == 1)
         chips = pg.locator(".fchip").all_inner_texts()
         check("cancelled: chip shows 1", any(c.replace("\n", "").startswith("Cancelled") and c.strip().endswith("1") for c in chips), chips)
         pg.click(".fchip:has-text('Cancelled')"); pg.wait_for_timeout(300)

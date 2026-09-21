@@ -1,6 +1,6 @@
 PASS cancelled: $999 sale is NOT in the total payout | ['$1,902.83', '$1,902.83', '$0.00']
-PASS cancelled: hidden from the All list
-PASS cancelled: chip shows 1 | ['All20', 'Pending payout20', 'Paid out0', 'Unassigned4', 'Missing cost15', 'Jon10', 'Jax6', 'Cancelled1']
+PASS cancelled: shown in the All list too, marked with a red Cancelled badge
+PASS cancelled: chip shows 1 | ['All21', 'Pending payout20', 'Paid out0', 'Unassigned4', 'Missing cost15', 'Jon10', 'Jax6', 'Cancelled1']
 PASS cancelled: chip lists it faded with a Remove button
 PASS cancelled: no owner/edit controls on it
 PASS inventory: product with no sales or batches is hidden
