@@ -1,0 +1,4 @@
+edited title, not confirmed -> kept apart: [['NEW Pokemon Ascended Heroes Elite Trainer Box SEALED', 1], ['Pokemon Ascended Heroes Elite Trainer Box', 1]] | sale on the relist has no cost yet: [50, None]
+confirmed same item -> one group: [['NEW Pokemon Ascended Heroes Elite Trainer Box SEALED', 2]] | both sales share the stock and cost: [50, 50]
+a different product (bundle) is never merged: [['Pokemon Ascended Heroes Booster Bundle', 1], ['NEW Pokemon Ascended Heroes Elite Trainer Box SEALED', 2]]
+errors: []

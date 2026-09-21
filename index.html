@@ -1243,14 +1243,22 @@
   var lastPurchaseUndo = null, pendingBought = null, pendingTrip = null, lastTripUndo = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
   function nameKey(name){ return String(name || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+  // Which items are "the same product"? Identical titles always are. A relisted item with an edited title is only
+  // treated as the same once somebody confirmed it (a Discord card asks): the confirmed product carries `sameAs`
+  // pointing at the one it matches, and everything (stock, cost, profit) then counts them as one.
+  function prodKey(p){
+    var hops = 0;
+    while (p && p.sameAs && hops++ < 5){ var r = productById(p.sameAs); if (!r) break; p = r; }
+    return nameKey(p && p.name);
+  }
   function groupKeyForSale(s){
     var p = productById(s.productId);
-    return nameKey((p && p.name) || s.productId);
+    return p ? prodKey(p) : nameKey(s.productId);
   }
   function pidsForKey(k){
     var m = memoStore && (memoStore.pids = memoStore.pids || {});
     if (m && m[k]) return m[k];
-    var out = state.products.filter(function(p){ return nameKey(p.name)===k; }).map(function(p){ return p.id; });
+    var out = state.products.filter(function(p){ return prodKey(p)===k; }).map(function(p){ return p.id; });
     if (m) m[k] = out;
     return out;
   }
@@ -1755,7 +1763,7 @@
     state.sales.forEach(function(x){ active[x.productId] = 1; });
     state.batches.forEach(function(x){ active[x.productId] = 1; });
     var pg = {};
-    state.products.forEach(function(p){ if (active[p.id]){ var k = nameKey(p.name); (pg[k] = pg[k] || []).push(p); } });
+    state.products.forEach(function(p){ if (active[p.id]){ var k = prodKey(p); (pg[k] = pg[k] || []).push(p); } });
     var out = Object.keys(pg).map(function(k){
       var ps = pg[k].slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
       var img = ps.filter(function(x){ return x.imageUrl; })[0];
@@ -1776,7 +1784,7 @@
   // batches of the same product (any owner, any listing) that still have no price
   function unpricedSiblings(b){
     var pr = productById(b.productId);
-    var pids = pr ? pidsForKey(nameKey(pr.name)) : [b.productId];
+    var pids = pr ? pidsForKey(prodKey(pr)) : [b.productId];
     return state.batches.filter(function(x){ return x.id!==b.id && pids.indexOf(x.productId)!==-1 && !costLogged(x); });
   }
   // the price already logged for this item, so it never has to be typed twice
@@ -1935,7 +1943,7 @@
     if (q.cost){
       var p = productById(q.cost);
       if (!p){ toast("That item is no longer in the ledger"); return; }
-      openItemTrip(nameKey(p.name)); return;
+      openItemTrip(prodKey(p)); return;
     }
   }
   function openItemTrip(key){
@@ -2444,7 +2452,7 @@
 
   function openAddBatchModal(productId){
     var p = productById(productId);
-    var addSug = p ? suggestedCost(pidsForKey(nameKey(p.name)), whoAmI) : null;
+    var addSug = p ? suggestedCost(pidsForKey(prodKey(p)), whoAmI) : null;
     openModal("Add batch — "+(p?p.name:""),
       "<div class='row2'><div class='field'><label>Owner</label><select id='f_owner'>"+ownerOptions(whoAmI)+"</select></div>"+
       "<div class='field'><label>Quantity</label><input id='f_qty' type='number' min='1' step='1' value='1'></div></div>"+
@@ -2465,7 +2473,7 @@
     var mineSibs = sibs.filter(function(x){ return x.owner===b.owner; }), otherSibs = sibs.filter(function(x){ return x.owner!==b.owner; });
     var units = function(a){ return a.reduce(function(n,x){ return n + Number(x.quantity||0); }, 0); };
     var otherName = b.owner==="Jon" ? "Jax" : "Jon";
-    var sug = costLogged(b) ? null : suggestedCost(pidsForKey(nameKey(p ? p.name : "")), b.owner);
+    var sug = costLogged(b) ? null : suggestedCost(pidsForKey(p ? prodKey(p) : nameKey("")), b.owner);
     var applyAll = (sug!=null ? "<div class='hint' style='margin-top:-6px'>Filled in from the price already logged for this item. Change it if this one cost something different.</div>" : "")+
       (sibs.length
         ? "<div class='field'><label>Use this price for</label><div class='seg-choice'>"+
