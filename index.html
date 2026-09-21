@@ -310,6 +310,7 @@
   body[data-tab="preorders"]{ --tabc:#ff8a1f; --tabg:linear-gradient(135deg,#ffb020,#ff5a3c); }
   body[data-tab="sales"]{ --tabc:#0aa877; --tabg:linear-gradient(135deg,#00b37a,#00c2d1); }
   body[data-tab="settlements"]{ --tabc:#ee2f8a; --tabg:linear-gradient(135deg,#ff4fa3,#9b3dff); }
+  body[data-tab="insights"]{ --tabc:#6a45ff; --tabg:linear-gradient(135deg,#6a45ff,#b23cff); }
 
   body{
     background:
@@ -671,6 +672,22 @@
   .stk-legend{ display:flex; flex-wrap:wrap; gap:6px 16px; font-size:12.5px; color:var(--muted); font-weight:600; }
   .stk-legend i, .split-rows i{ display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; }
   .stk-legend b{ color:var(--ink); font-variant-numeric:tabular-nums; margin-right:4px; }
+
+  /* insights */
+  .ins-drops{ display:flex; flex-direction:column; gap:8px; }
+  .ins-drop{ display:flex; align-items:baseline; justify-content:space-between; gap:12px; }
+  .ins-drop span{ min-width:0; overflow-wrap:anywhere; }
+  .ins-drop b{ flex:0 0 auto; }
+  .ins-item{ padding:14px 16px; display:flex; flex-direction:column; gap:8px; }
+  .ins-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:12px; }
+  .ins-name{ font-weight:600; min-width:0; overflow-wrap:anywhere; }
+  .ins-profit{ flex:0 0 auto; text-align:right; font-weight:700; font-variant-numeric:tabular-nums; }
+  .ins-profit small{ display:block; font-weight:500; color:var(--muted); font-size:12px; }
+  .ins-profit.neg{ color:var(--danger, #d64545); }
+  .ins-facts{ display:flex; flex-wrap:wrap; gap:4px 12px; color:var(--muted); font-size:13px; }
+  .ins-facts span{ white-space:nowrap; }
+  .ins-bar{ height:6px; border-radius:3px; background:var(--surface-2); overflow:hidden; }
+  .ins-bar i{ display:block; height:100%; background:var(--tabc, #6a45ff); }
   .stk-row{ display:flex; flex-direction:column; gap:5px; }
   .stk-name{ font-size:13px; font-weight:600; color:var(--ink); line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
   .stk-bar{ display:flex; gap:2px; height:12px; }
@@ -836,7 +853,7 @@
   var memoStore = null;
   var db = null;
   var tab = "overview";
-  var TABS = ["overview","inventory","preorders","sales","settlements"];
+  var TABS = ["overview","inventory","preorders","sales","settlements","insights"];
   // "#inventory?cost=<productId>" -> tab + params; Discord alert cards link straight to the fix
   function parseHash(){
     var raw = (location.hash||"").replace(/^#/, ""), parts = raw.split("?"), q = {};
@@ -1181,7 +1198,7 @@
       b.classList.toggle("active", on);
       if (on) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");
     });
-    var titles = { overview:"Overview", inventory:"Inventory", preorders:"Preorders", sales:"Sales", settlements:"Settlements" };
+    var titles = { overview:"Overview", inventory:"Inventory", preorders:"Preorders", sales:"Sales", settlements:"Settlements", insights:"Insights" };
     $("#pageTitle").innerHTML = "<h1>"+titles[tab]+"</h1>";
     renderReviewBanner();
     renderOwnerBanner();
@@ -1194,6 +1211,7 @@
     else if (tab==="preorders") main.innerHTML = renderPreorders();
     else if (tab==="sales") main.innerHTML = renderSales();
     else if (tab==="settlements") main.innerHTML = renderSettlements();
+    else if (tab==="insights") main.innerHTML = renderInsights();
     paintIcons();
     if (pendingDeepLink && !isLoading()){
       var dl = pendingDeepLink; pendingDeepLink = null;
@@ -1607,6 +1625,73 @@
     return "<div class='section-head'><h2>eBay charges</h2><span class='count'>this month "+money(month)+" · all time "+money(total)+"</span></div>"+
       "<div class='card'><div class='confirm-list'>"+rows+"</div><div class='hint'>Ads, store fees and credits that eBay does not tie to a sale. They are not in any sale's payout and not counted in the balance between you two.</div></div>";
   }
+  // ---------- insights: which items and drops actually made money ----------
+  // Built only from what is in the ledger. Profit and return use the cost matched to each sale
+  // (oldest purchase first); a sale with no cost yet is left out of profit and counted separately, so
+  // an unpriced item never looks like pure profit.
+  var insSort = "profit";
+  var DROPS = [ ["Ascended Heroes", /ascended\s*heroes/i], ["Prismatic Evolutions", /prismatic/i], ["Surging Sparks", /surging\s*sparks/i],
+                ["30th Anniversary", /30th/i], ["One Piece", /one\s*piece/i], ["Zelda / Switch", /zelda|switch\s*2/i],
+                ["PlayStation", /ps5|playstation|gta/i], ["Pokemon, other", /pok[eé]mon/i] ];
+  function dropOf(name){
+    for (var i=0;i<DROPS.length;i++){ if (DROPS[i][1].test(String(name||""))) return DROPS[i][0]; }
+    return "Other";
+  }
+  function insightRows(){
+    var costs = fifoCosts();
+    return productGroupList().map(function(g){
+      var sold = 0, payout = 0, cQty = 0, cCost = 0, cPay = 0, unpriced = 0;
+      state.sales.forEach(function(s){
+        if (g.pids.indexOf(s.productId)===-1) return;
+        var q = Number(s.quantitySold||1), u = costs[s.id];
+        sold += q; payout += Number(s.netProfit||0);
+        if (u==null) unpriced += q; else { cQty += q; cCost += u*q; cPay += Number(s.netProfit||0); }
+      });
+      var st = groupStock(g.pids), profit = cPay - cCost;
+      return { name:g.p.name, drop:dropOf(g.p.name), sold:sold, payout:payout, avgPayout: sold ? payout/sold : null,
+               costedQty:cQty, avgCost: cQty ? cCost/cQty : null, profit:profit, roi: cCost>0 ? profit/cCost : null,
+               unpriced:unpriced, onHand:Math.max(0, st.remaining), incoming:st.pipeline };
+    }).filter(function(r){ return r.sold>0; });
+  }
+  function pct(v){ return v==null ? "—" : (v>=0?"+":"")+Math.round(v*100)+"%"; }
+  function renderInsights(){
+    var rows = insightRows();
+    if (!rows.length) return "<div class='card empty'><div class='ic' data-icon='sales'></div>Nothing to compare yet. Once items sell and have a price, they show up here.</div>";
+    var sorters = { profit:function(a,b){ return b.profit-a.profit; }, roi:function(a,b){ return (b.roi==null?-9:b.roi)-(a.roi==null?-9:a.roi); }, units:function(a,b){ return b.sold-a.sold; } };
+    var totCost = 0, totProfit = 0, totUnpriced = 0, drops = {};
+    rows.forEach(function(r){
+      var c = r.avgCost==null ? 0 : r.avgCost*r.costedQty;
+      totProfit += r.profit; totCost += c; totUnpriced += r.unpriced;
+      var d = drops[r.drop] = drops[r.drop] || { name:r.drop, sold:0, profit:0, cost:0 };
+      d.sold += r.sold; d.profit += r.profit; d.cost += c;
+    });
+    var html = "<div class='tiles'>"+
+      "<div class='tile t-profit'><div class='eyebrow'>Profit so far</div><div class='value'>"+money(totProfit)+"</div><div class='sub'>payout minus what was paid, on sales that have a cost</div></div>"+
+      "<div class='tile'><div class='eyebrow'>Return on cost</div><div class='value'>"+(totCost>0 ? pct(totProfit/totCost) : "—")+"</div><div class='sub'>"+(totUnpriced ? totUnpriced+" sold unit"+(totUnpriced===1?"":"s")+" still need a cost and are not counted" : "every sold unit has a cost")+"</div></div></div>";
+    var dl = Object.keys(drops).map(function(k){ return drops[k]; }).sort(function(a,b){ return b.profit-a.profit; });
+    html += "<div class='section-head'><h2>By drop</h2></div><div class='card dash-card'><div class='ins-drops'>"+
+      dl.map(function(d){ return "<div class='ins-drop'><span>"+esc(d.name)+" <small class='sale-sub'>"+d.sold+" sold</small></span><b>"+money(d.profit)+(d.cost>0 ? " · "+pct(d.profit/d.cost) : "")+"</b></div>"; }).join("")+"</div></div>";
+    html += "<div class='section-head'><h2>By item</h2></div><div class='fchips' style='margin-bottom:12px'>"+
+      [["profit","Most profit"],["roi","Best return"],["units","Most sold"]].map(function(c){
+        return "<button type='button' class='fchip"+(insSort===c[0]?" on":"")+"' data-action='ins-sort' data-f='"+c[0]+"'>"+c[1]+"</button>"; }).join("")+"</div>";
+    html += "<div class='sales-list'>"+rows.slice().sort(sorters[insSort]||sorters.profit).map(function(r){
+      var known = r.costedQty > 0, neg = known && r.profit < 0, share = r.sold ? Math.round(r.costedQty/r.sold*100) : 0;
+      return "<div class='card ins-item'><div class='ins-top'><div class='ins-name'>"+esc(r.name)+"</div>"+
+        "<div class='ins-profit"+(neg?" neg":"")+"'>"+(known ? money(r.profit)+"<small>"+pct(r.roi)+" return</small>" : "<small>add cost</small>")+"</div></div>"+
+        "<div class='ins-facts'><span>"+r.sold+" sold</span>"+(r.avgPayout!=null?"<span>avg payout "+money(r.avgPayout)+"</span>":"")+(r.avgCost!=null?"<span>avg cost "+money(r.avgCost)+"</span>":"")+
+        (r.onHand?"<span>"+r.onHand+" on hand</span>":"")+(r.incoming?"<span>"+r.incoming+" incoming</span>":"")+"</div>"+
+        (known && share<100 ? "<div class='ins-bar' title='share of sold units that have a cost'><i style='width:"+share+"%'></i></div><div class='sale-sub'>"+r.costedQty+" of "+r.sold+" sold units have a cost</div>" : "")+
+        "</div>";
+    }).join("")+"</div>";
+    html += "<div class='hint' style='margin-top:12px'>Numbers get more useful as more sales come in. Days-to-sell is not shown yet because the ledger does not record when an item was bought.</div>";
+    return html;
+  }
+  function insightsPreviewHtml(){
+    var top = insightRows().filter(function(r){ return r.costedQty>0; }).sort(function(a,b){ return b.profit-a.profit; }).slice(0,3);
+    if (!top.length) return "";
+    return "<div class='section-head'><h2>Top earners</h2><button class='btn ghost' data-action='goto-insights'>Insights</button></div><div class='card'><div class='confirm-list'>"+
+      top.map(function(r){ return "<div class='confirm-row'><span>"+esc(r.name)+"<small>"+r.sold+" sold · "+pct(r.roi)+" return</small></span><span>"+money(r.profit)+"</span></div>"; }).join("")+"</div></div>";
+  }
   function renderOverview(){
     var other = whoAmI === "Jon" ? "Jax" : "Jon";
     var myTied = cashTiedUp(whoAmI), otherTied = cashTiedUp(other);
@@ -1617,7 +1702,7 @@
       "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
       "</div>";
 
-    html += payoutChartHtml() + chargesCardHtml() + dashCardsHtml();
+    html += payoutChartHtml() + chargesCardHtml() + dashCardsHtml() + insightsPreviewHtml();
     var latest = state.sales.slice().sort(bySaleNewest).slice(0,4);
     html += "<div class='section-head'><h2>Latest sales</h2><button class='btn ghost' data-action='goto-sales'>See all</button></div>";
     html += latest.length
@@ -2537,6 +2622,8 @@
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
+    if (action==="goto-insights") return setTab("insights");
+    if (action==="ins-sort"){ insSort = t.dataset.f; render(); return; }
     if (action==="goto-preorders") return setTab("preorders");
 
     if (action==="open-add-batch") return openAddBatchModal(t.dataset.product);

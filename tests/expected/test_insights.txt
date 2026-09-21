@@ -1,0 +1,18 @@
+390 overview preview: True | button: 1
+  title: Insights | hash: #insights
+  tiles: ['PROFIT SO FAR | -$0.89 | payout minus what was paid, on sales that have a cost', 'RETURN ON COST | 0% | 15 sold units still need a cost and are not counted']
+  drops: ['One Piece 3 sold $157.68 · +65%', 'Other 1 sold $59.84 · +44%', 'PlayStation 1 sold $41.07 · +53%', '30th Anniversary 14 sold $0.00', 'Zelda / Switch 4 sold -$259.48 · -36%']
+  items: 13
+  sort roi -> first: Nike x ONE PIECE TCG 4 Cards Set P-099 L | chip on: Best return
+  sort units -> first: The Legend of Zelda 40th Anniversary Nin | chip on: Most sold
+  sort profit -> first: One Piece x Round 1 Promo Trading Cards  | chip on: Most profit
+  no sideways scroll: True | errors: []
+320 overview preview: True | button: 1
+  title: Insights | hash: #insights
+  tiles: ['PROFIT SO FAR | -$0.89 | payout minus what was paid, on sales that have a cost', 'RETURN ON COST | 0% | 15 sold units still need a cost and are not counted']
+  drops: ['One Piece 3 sold $157.68 · +65%', 'Other 1 sold $59.84 · +44%', 'PlayStation 1 sold $41.07 · +53%', '30th Anniversary 14 sold $0.00', 'Zelda / Switch 4 sold -$259.48 · -36%']
+  items: 13
+  sort roi -> first: Nike x ONE PIECE TCG 4 Cards Set P-099 L | chip on: Best return
+  sort units -> first: The Legend of Zelda 40th Anniversary Nin | chip on: Most sold
+  sort profit -> first: One Piece x Round 1 Promo Trading Cards  | chip on: Most profit
+  no sideways scroll: True | errors: []
