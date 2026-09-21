@@ -1,0 +1,4 @@
+after Edit -> Jax: sale owner: Jax | its stock entry owner: Jax | other sale's stock untouched: Jon | cost follows: 30
+payout box for a sale with no payout: ''
+payout after saving untouched: None
+errors: []

@@ -2389,7 +2389,7 @@
       "<div class='field'><label>Sale date</label><input id='f_date' type='date' value='"+todayISO()+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' placeholder='After eBay fees & shipping' required></div>"+
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' placeholder='0.00'></div></div>"+
-      "<div class='row2'><div class='field'><label>Buyer username (optional)</label><input id='f_buyer' type='text' placeholder='eBay username, e.g. cancerv_96'></div>"+
+      "<div class='row2'><div class='field'><label>Buyer username (optional)</label><input id='f_buyer' type='text' placeholder='eBay username, e.g. buyer_123'></div>"+
       "<div class='field'><label>Order # (optional)</label><input id='f_ordernum' type='text' placeholder='11-15148-37978'></div></div>"+
       "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptions(suggested)+"</select><div class='hint'>Suggested from your priority rule (Jon fills his batch quantity first) — change it anytime.</div></div>"+
       "<div class='field'><label>Funds status</label><select id='f_funds'>"+
@@ -2408,7 +2408,7 @@
       "<div class='field'><label>Item</label><select id='f_product'>"+productOptions(s.productId)+"</select></div>"+
       "<div class='row2'><div class='field'><label>Quantity sold</label><input id='f_qty' type='number' min='1' step='1' value='"+s.quantitySold+"'></div>"+
       "<div class='field'><label>Sale date</label><input id='f_date' type='date' value='"+(s.saleDate||todayISO())+"'></div></div>"+
-      "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' value='"+s.netProfit+"'></div>"+
+      "<div class='row2'><div class='field'><label>Payout ($)</label><input id='f_profit' type='number' step='0.01' value='"+(s.netProfit==null?"":s.netProfit)+"'></div>"+
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' value='"+(s.soldPrice||"")+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username</label><input id='f_buyer' type='text' value='"+esc(s.buyerName||"")+"'></div>"+
       "<div class='field'><label>Order #</label><input id='f_ordernum' type='text' value='"+esc(s.orderNumber||"")+"'></div></div>"+
@@ -2642,9 +2642,12 @@
       var editWho = $("#f_who").value || null;
       var editFundsVal = $("#f_funds").value;
       var prevSale = state.sales.find(function(x){ return x.id===sid; }) || {};
+      if (editWho && prevSale.attributedTo && editWho !== prevSale.attributedTo){
+        batchesForSale(sid).forEach(function(b){ updateBatch(b.id, { owner: editWho }); }); // its stock follows it, like the owner tap
+      }
       updateSale(sid, Object.assign({
         productId: editPid, quantitySold: editQty,
-        saleDate: editDate, netProfit: Number($("#f_profit").value)||0,
+        saleDate: editDate, netProfit: ($("#f_profit").value==="" && prevSale.netProfit==null) ? null : (Number($("#f_profit").value)||0),
         soldPrice: $("#f_price").value ? Number($("#f_price").value) : null,
         attributedTo: editWho, note: $("#f_note").value.trim(),
         buyerName: $("#f_buyer").value.trim() || null,
