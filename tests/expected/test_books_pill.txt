@@ -1,0 +1,14 @@
+390 px, before any check: ''
+  all clear: Books check: all clear | amber: False
+  needs you: Books check: 3 to fix | amber: True
+  list: Round 1 x One Piece Collab Club Card Zoro Sanji LOADED With a very long title that has to wrap (tbt_vending): no purchase price | Pikachu ex (buyer2): no shipping label cost | and 1 more. | Most of these have a card in Discord with a button that fixes them. This list updates on its own. | Checked 1 min ago.
+  no sideways scroll: True
+  old check: Books check delayed
+  errors: []
+320 px, before any check: ''
+  all clear: Books check: all clear | amber: False
+  needs you: Books check: 3 to fix | amber: True
+  list: Round 1 x One Piece Collab Club Card Zoro Sanji LOADED With a very long title that has to wrap (tbt_vending): no purchase price | Pikachu ex (buyer2): no shipping label cost | and 1 more. | Most of these have a card in Discord with a button that fixes them. This list updates on its own. | Checked 1 min ago.
+  no sideways scroll: True
+  old check: Books check delayed
+  errors: []

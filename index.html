@@ -608,6 +608,7 @@
   .sync-row{ display:flex; justify-content:flex-end; min-height:0; margin:0 0 10px; }
   .sync-pill{ display:inline-flex; align-items:center; gap:8px; font-size:12px; font-weight:600; color:var(--muted); background:var(--surface); border:1px solid var(--border); padding:5px 12px; border-radius:99px; }
   .sync-pill:empty{ display:none; }
+  .books-pill{ cursor:pointer; margin-left:8px; font:inherit; font-size:12px; font-weight:600; }
   .sync-pill i{ width:8px; height:8px; border-radius:50%; background:var(--good); box-shadow:0 0 0 3px var(--good-soft); }
   .sync-pill.stale{ color:var(--warn); }
   .sync-pill.stale i{ background:var(--warn); box-shadow:0 0 0 3px var(--warn-soft); }
@@ -831,7 +832,7 @@
       </div>
     </div>
     <div id="syncBanner"></div>
-    <div class="sync-row"><span id="syncPill" class="sync-pill" role="status"></span></div>
+    <div class="sync-row"><span id="syncPill" class="sync-pill" role="status"></span><button type="button" id="booksPill" class="sync-pill books-pill" data-action="books-open"></button></div>
     <div id="reviewBanner"></div>
     <div id="ownerBanner"></div>
     <div id="costBanner"></div>
@@ -851,7 +852,7 @@
   // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
   var AUTO_BATCH_NOTE = "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.";
 
-  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [], market: {} };
+  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [], market: {}, books: null };
   var memoStore = null;
   var db = null;
   var tab = "overview";
@@ -941,6 +942,25 @@
     var h = Math.floor(m/60);
     return h < 24 ? h+" hr ago" : Math.floor(h/24)+" d ago";
   }
+  // The books check (run by the server on every refresh): green when every rule that keeps Jon's and Jax's profits separate holds,
+  // amber with a count when something is unfinished or wrong. Tap it for the list.
+  function paintBooksPill(){
+    var el = $("#booksPill"); if (!el) return;
+    var b = state.books;
+    if (!b || !b.at){ el.className = "sync-pill books-pill"; el.innerHTML = ""; return; }
+    var stale = (Date.now()-b.at)/60000 > 45;
+    el.className = "sync-pill books-pill" + (stale || !b.ok ? " stale" : "");
+    el.innerHTML = "<i></i>" + (stale ? "Books check delayed" : (b.ok ? "Books check: all clear" : "Books check: "+b.n+" to fix"));
+  }
+  function openBooks(){
+    var b = state.books; if (!b) return;
+    var rows = (b.findings||[]).map(function(f){ return "<div class='confirm-row'><span>"+esc(f.text)+"</span></div>"; }).join("");
+    openModal("Books check",
+      (b.ok ? "<div class='hint'>Every rule holds: each sale has an owner, a price and its label, payouts match eBay's records, and nothing is duplicated.</div>"
+            : "<div class='confirm-list'>"+rows+"</div>"+((b.n||0) > (b.findings||[]).length ? "<div class='hint'>and "+(b.n-(b.findings||[]).length)+" more.</div>" : "")+"<div class='hint'>Most of these have a card in Discord with a button that fixes them. This list updates on its own.</div>")+
+      "<div class='sale-sub' style='margin-top:10px'>Checked "+relTime(b.at)+".</div>",
+      "<button class='btn primary' data-action='close-modal'>Close</button>");
+  }
   function paintSyncPill(){
     var elp = $("#syncPill"); if (!elp) return;
     if (!syncMeta || !syncMeta.lastSync){ elp.className = "sync-pill"; elp.innerHTML = ""; return; }
@@ -979,9 +999,11 @@
     sub("sales","sales");
     sub("settlements","settlements");
     sub("expenses","expenses");
+    db.collection("meta").doc("books").onSnapshot(function(d){ state.books = d.exists ? d.data() : null; paintBooksPill(); }, function(){});
     db.collection("meta").doc("market").onSnapshot(function(d){ state.market = d.exists ? d.data() : {}; scheduleRender(); }, function(){});
     db.collection("meta").doc("ebay").onSnapshot(function(d){ syncMeta = d.exists ? d.data() : null; paintSyncPill(); }, function(){});
     setInterval(paintSyncPill, 30000);
+    setInterval(paintBooksPill, 60000);
   }
 
   function localAdd(collection, data){
@@ -2591,6 +2613,7 @@
     if (action==="undo-owner"){ undoOwner(); var tq = t.closest(".toast"); if (tq) tq.remove(); return; }
     if (action==="flip-owner"){ flipOwner(t.dataset.id); return; }
     if (action==="goto-sales") return setTab("sales");
+    if (action==="books-open") return openBooks();
     if (action==="goto-insights") return setTab("insights");
     if (action==="sale-breakdown") return openBreakdown(t.dataset.id);
     if (action==="ins-sort"){ insSort = t.dataset.f; render(); return; }
