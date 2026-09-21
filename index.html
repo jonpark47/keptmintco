@@ -1238,14 +1238,34 @@
   // "net profit" is really eBay's payout (after fees and label). Real profit also subtracts what
   // the owner paid, so it only exists once a unit cost has been entered for that owner's stock.
   // The balance between Jon and Jax always uses the payout, never this.
-  function unitCostFor(s){
-    if (!s.attributedTo) return null;
-    var pids = pidsForKey(groupKeyForSale(s)), qty = 0, tot = 0;
-    state.batches.forEach(function(b){
-      if (pids.indexOf(b.productId)===-1 || b.owner!==s.attributedTo || (!Number(b.unitCost) && !b.costKnown)) return;
-      qty += Number(b.quantity||0); tot += Number(b.quantity||0)*Number(b.unitCost);
+  // What did the units in THIS sale cost? Oldest purchase first (FIFO), per owner and item: the first
+  // units sold count as the first units bought. A later purchase at a different price therefore never
+  // changes what an earlier sale cost. A sale whose units land on an unpriced purchase has no cost yet.
+  function fifoCosts(){
+    var m = memoStore && memoStore.fifo;
+    if (m) return m;
+    var pools = {}, out = {};
+    state.batches.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).forEach(function(b){
+      var k = groupKeyForSale({ productId:b.productId }) + "|" + b.owner;
+      (pools[k] = pools[k] || []).push({ left:Number(b.quantity||0), unit:costLogged(b) ? Number(b.unitCost||0) : null });
     });
-    return qty ? tot/qty : null;
+    state.sales.slice().sort(function(a,b){ return String(a.saleDate||"").localeCompare(String(b.saleDate||"")) || (a.createdAt||0)-(b.createdAt||0); }).forEach(function(s){
+      if (!s.attributedTo){ out[s.id] = null; return; }
+      var qty = Number(s.quantitySold||1), need = qty, tot = 0, ok = true;
+      (pools[groupKeyForSale(s) + "|" + s.attributedTo] || []).forEach(function(lot){
+        if (need<=0 || lot.left<=0) return;
+        var take = Math.min(lot.left, need);
+        lot.left -= take; need -= take;
+        if (lot.unit==null) ok = false; else tot += take*lot.unit;
+      });
+      out[s.id] = (ok && need<=0) ? tot/qty : null;
+    });
+    if (memoStore) memoStore.fifo = out;
+    return out;
+  }
+  function unitCostFor(s){
+    var u = fifoCosts()[s.id];
+    return u==null ? null : u;
   }
   function saleProfit(s){
     var u = unitCostFor(s);

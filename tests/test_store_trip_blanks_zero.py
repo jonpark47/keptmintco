@@ -43,7 +43,7 @@ try:
         print("after undo known:", pg.evaluate("window.__t.state().batches.filter(b=>b.costKnown).length"))
         # zero cost counts as known for profit
         pg.evaluate("""() => { const S = window.__t.state(); S.sales.forEach(sa => { sa.attributedTo = 'Jon'; });
-            S.batches = S.batches.filter(b => !S.sales.some(sa => sa.productId === b.productId)).concat(S.sales.map((sa,i) => ({id:'z'+i, productId: sa.productId, owner:'Jon', quantity:1, unitCost:0, costKnown:true, status:'received', createdAt:1}))); window.__t.render(); }""")
+            S.batches = S.batches.filter(b => !S.sales.some(sa => sa.productId === b.productId)).concat(S.sales.map((sa,i) => ({id:'z'+i, productId: sa.productId, owner:'Jon', quantity:Number(sa.quantitySold||1), unitCost:0, costKnown:true, status:'received', createdAt:1}))); window.__t.render(); }""")
         pg.evaluate("window.__t.setTab('sales')"); pg.wait_for_timeout(300)
         print("first sale money:", pg.locator(".sale-money").first.inner_text().replace("\n"," | "))
         print("errors:", errs)
