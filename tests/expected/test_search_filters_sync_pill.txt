@@ -1,0 +1,15 @@
+hash start tab: sales | tesseract loaded at start: False
+chips: ['All20', 'Pending payout20', 'Paid out0', 'Unassigned3', 'Missing cost14', 'Jon11', 'Jax6']
+unassigned rows: 3
+search 'pikachu' rows: 1 | focus kept: salesSearch | value: pikachu
+no-match msg: No sales match that. Clear the search or pick another filter
+pill: eBay synced 3 min ago
+pill stale: eBay sync delayed · last 47 min ago sync-pill stale
+after nav click hash: #overview tab: overview
+back -> sales
+inv search nami: 1 1 of 13
+modal open focus in modal: True
+focus trapped in modal after 30 tabs: True
+focus restored to trigger: open-add-sale
+skeleton shown: True aria-busy: true
+scrollW 390 errors: []

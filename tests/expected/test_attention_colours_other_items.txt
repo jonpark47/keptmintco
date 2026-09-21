@@ -1,0 +1,5 @@
+no 'other' yet: Some items have no price yet. Enter it, tap “It was $0”, or skip the item.
+with other $50: Some items have no price yet. Enter it, tap “It was $0”, or skip the item.
+confirm: Jon paid $162.00 · 2 units + $50.00 of other items not listed | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario | 1 × $50.00 + $4.00 tax & fees = $54.00 for 1 unit | Check this: it has sold for about $25.02 each, less than this cost. Is the price you typed for ONE unit, not the total fo
+light errors: []
+dark errors: []

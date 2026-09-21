@@ -1,0 +1,8 @@
+m panel: NEEDS YOU | 8 items need a purchase price | Add what you paid so your profit can be tracked. | Add all 8 | PT | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario | no purchase price yet | Add price | GP | GRADABLE Pikac
+m nav dots: ['8', '8']
+Add all -> ticked: 8 of 13
+on Sales tab, panel hidden: True | nav dot still: True
+m errors: [] scrollW 390
+d panel: NEEDS YOU | 8 items need a purchase price | Add what you paid so your profit can be tracked. | Add all 8 | PT | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario | no purchase price yet | Add price | GP | GRADABLE Pikac
+d nav dots: ['8', '8']
+d errors: [] scrollW 1280

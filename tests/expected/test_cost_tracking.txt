@@ -1,0 +1,8 @@
+cost card: Costs logged | Fill in | 6 of 13 items have their cost | GRADABLE Pikachu ex 150/128 Me: 30th Celebration Holo | Pokemon TCG 30th Celebration: Poster Collection - Brand New - IN HAND | GRADABLE Pokémon 30th Anniversary Mew ex SIR 152/128 NM | Pokemon TCG 30th 
+tab: inventory | filtered cards: 7 | header: 7 of 13
+badges: []
+all cards: 13 | ok badges: 6 | missing badges: 0
+sales chips: ['All20', 'Pending payout20', 'Paid out0', 'Unassigned3', 'Missing cost12', 'Jon11', 'Jax6']
+missing-cost sales: 12
+tiles: ['YOUR PAYOUT | $1,189.87 | $0.00 available · $1,189.87 pending across 11 sales', 'YOUR PROFIT (INTERNAL) | $82.07 | so far, 5 sales still need a cost. Just for your own tracking. It never changes what you and Jax owe each other.', "AVAILABLE TO SETTLE NOW | You're all settled up | From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it."]
+errors: [] scrollW 390

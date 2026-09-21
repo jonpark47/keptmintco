@@ -1,0 +1,17 @@
+PASS cancelled: $999 sale is NOT in the total payout | ['$1,902.83', '$1,902.83', '$0.00']
+PASS cancelled: hidden from the All list
+PASS cancelled: chip shows 1 | ['All20', 'Pending payout20', 'Paid out0', 'Unassigned4', 'Missing cost15', 'Jon10', 'Jax6', 'Cancelled1']
+PASS cancelled: chip lists it faded with a Remove button
+PASS cancelled: no owner/edit controls on it
+PASS inventory: product with no sales or batches is hidden
+PASS edit sale: unassigned sale shows an Unassigned option first | ['Unassigned', 'Jon', 'Jax']
+PASS edit sale: saving a note does NOT silently assign Jon | (None, 'auto')
+PASS edit sale: Enter key saves | Jax
+PASS edit sale: owner and payout you typed are locked as manual | ('manual', 'manual')
+PASS remove: confirm explains eBay sales stay removed | Remove this sale? Any purchase entry the app auto-created for it goes too. This can't be undone.
+PASS remove: sale gone AND its unpriced placeholder batch gone | {'sales': False, 'batch': False}
+PASS settlement: form starts as Jax -> Jon for what is owed | ('Jax', '1784.72', 1784.7199999999998)
+PASS modal: money field asks for the decimal keypad
+PASS settlement: zero amount refused
+errors: []
+RESULT: ALL PASSED

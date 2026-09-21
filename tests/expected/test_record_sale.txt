@@ -1,0 +1,4 @@
+add-sale fields: ['f_product:select-one', 'f_qty:number', 'f_date:date', 'f_profit:number', 'f_price:number', 'f_buyer:text', 'f_ordernum:text', 'f_who:select-one', 'f_funds:select-one', 'f_note:textarea']
+sales before/after: 20 21 | toast: Sale recorded
+edit ok, toast: Sale recorded Sale updated
+import bar present: 0 | errors: []

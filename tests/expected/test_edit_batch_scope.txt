@@ -1,0 +1,3 @@
+scope options: 2
+costs: [[12.34, '', False], [12.34, '', False]] | Price applied to this batch and 1 more
+errors: []

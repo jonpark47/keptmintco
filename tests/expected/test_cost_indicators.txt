@@ -1,0 +1,6 @@
+overview | cost pills: 4 | strips: 0
+inventory | cost pills: 5 | strips: 8
+preorders | cost pills: 0 | strips: 0
+sales | cost pills: 16 | strips: 0
+modal: Price for this item
+errors: [] scrollW 390

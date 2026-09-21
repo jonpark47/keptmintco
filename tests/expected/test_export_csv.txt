@@ -1,0 +1,5 @@
+file: keptmint-sales-DATE.csv | rows: 21 | header: ['Sale date', 'Order #', 'Item', 'Buyer', 'Qty', 'Payout']
+quoted buyer survived: True
+cancelled row marked: True | profit blank for it: ['']
+first data row: ['DATE', '00-00003-00003', 'Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario', 'buyer03', '1', '25.66', 'Jon', '', '', '', 'Pending payout', 'Active']
+eBay links on cards: 14 | errors: [] | scrollW 390

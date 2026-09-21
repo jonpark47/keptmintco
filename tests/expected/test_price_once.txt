@@ -1,0 +1,15 @@
+A scope default: all
+A summary: Enter the total you paid at checkout. Use $32.90 (no tax)
+A total now: 32.9
+A confirm note: m with no batch for Jon gets one created. You can undo right after. Also fills in 1 unit of Jax's that has no price yet.
+A after one entry: [['Jon', 16.45, True], ['Jon', 16.45, True], ['Jax', 16.45, True]]
+A after undo: [['Jon', 0, False], ['Jon', 0, False], ['Jax', 0, False]]
+B scope options: ["Everyone's units with no price yet (Jon 1 more, Jax 1)", "Just Jon's other units with no price yet (1)", 'Only this batch']
+B after one edit: [['Jon', 18, True], ['Jon', 18, True], ['Jax', 18, True]]
+A2 label: Only Jon's units
+A2 only Jon: [['Jon', 10, True], ['Jon', 10, True], ['Jax', 0, False]]
+B2 just mine: [['Jon', 12, True], ['Jon', 12, True], ['Jax', 0, False]]
+B3 only this batch: [['Jon', 12, True], ['Jon', 0, False], ['Jax', 0, False]]
+C edit prefill: 18 | Filled in from the price already logged for this item. Change it if th
+C add prefill: 18
+errors: [] scrollW 390

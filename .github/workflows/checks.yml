@@ -1,0 +1,52 @@
+name: ✅ Checks
+
+# Runs on every push and pull request; nothing here needs secrets. It exists so a cleanup can't quietly break
+# a button or a number that already works: the static check catches a deleted function that is still used,
+# the removals guard makes every deletion declared, and the browser tests replay the real flows on a phone-sized
+# screen and fail if anything they report changes.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the removals guard compares against the previous commit
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: App script has no undefined names, every button has a handler
+        run: python tools/check_app.py
+
+      - name: Removals must be declared in the commit message
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+          fi
+          if [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then BASE="HEAD~1"; fi
+          python tools/check_removals.py "$BASE" "${{ github.sha }}"
+
+      - name: Install browser
+        run: |
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Browser tests (every flow, phone-sized screen)
+        run: python tests/run_all.py

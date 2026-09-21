@@ -1,0 +1,17 @@
+unassigned at start: 14
+modal title: Assign to Jon? | still unassigned: True
+after cancel unassigned: True
+after confirm unassigned: 13 | toast: Now goes to Jon. Undo
+after undo unassigned: 14
+ALL modal: Assign to Jax? | Assign 3 sales to Jax | rows: 3
+after all->Jax unassigned: 11
+after undo all: 14
+flip modal: Switch to Jax?
+owner-group with 2+ batches: None
+trip rows: 13
+summary: Items $100.00 · tax & fees $8.50 (8.5%) · you paid $108.50
+confirm: Jon paid $108.50 · 3 units | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario | 1 × $50.00 + $4.25 tax & fees = $54.25 for 1 unit | Check this: it has sold for about $25.02 each, less than this cost. Is the price you typed for ONE unit, not the total for all 1? | $54.25 | each | GRADABLE Pikachu ex 150/128 Me: 30th Celebration Holo | 2 × $25.00 + $2.13 tax & fees = $54.26 for 2 units | $27.13 | each | The
+toast: Unit costs applied to 2 items. Undo
+trip undo toast: Undone — costs restored
+dash cards: 3 | stock rows: 6 | split rows: 3
+scrollW 390 errors: []

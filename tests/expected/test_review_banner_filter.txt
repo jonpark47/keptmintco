@@ -1,0 +1,9 @@
+overview | review banner: -
+sales | review banner: 8 items still need a purchase price so profit can be tracked. Review in Inventor
+preorders | review banner: 8 items still need a purchase price so profit can be tracked. Review in Inventor
+settlements | review banner: 8 items still need a purchase price so profit can be tracked. Review in Inventor
+inventory | review banner: -
+after click -> tab: inventory | header: 8 of 13 | cards: 8 | all show strip: True | chip on: Missing cost8
+panel 'See all' -> tab: inventory | cards: 8
+normal Inventory tap shows everything: 13
+errors: []

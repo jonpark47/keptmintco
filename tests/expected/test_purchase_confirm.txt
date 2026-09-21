@@ -1,0 +1,8 @@
+confirm modal text: Confirm who bought this | ✕ | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario — 3 sold so far | 2 | Jon bought | 1 | Jax bought | Each sale would go to: | $49.40 · buyer19 · ×2 | Jon | $25.66 · buyer03 | Jon | Bought but not sold yet, kept on hand: Jax 1. | Unit cost each ($) optional | What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit
+after tap: batches changed? False | owners: [['buyer03', 25.66, None], ['buyer19', 49.4, None]]
+custom values: 2 1
+confirm 1/2: 1 Jon bought 2 Jax bought
+after confirm owners: [['buyer03', 25.66, 'Jon'], ['buyer19', 49.4, 'Jax']] batches added: 0
+toast: Saved — sales split by who bought what. Undo
+after undo owners: [['buyer03', 25.66, None], ['buyer19', 49.4, None]] batches delta: 0
+errors: []

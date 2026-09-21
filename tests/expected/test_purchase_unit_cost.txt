@@ -1,0 +1,6 @@
+cost field present: 1
+cost kept after Back+Review: 24.5
+batches with cost: [['Jon', 1, 24.5, False, ''], ['Jon', 2, 24.5, False, ''], ['Jax', 1, 24.5, False, '']] | Saved — sales split and unit cost set to $24.50. Undo
+after undo: []
+no cost typed: [['Jon', 1, 0, True, 'Purchase'], ['Jon', 2, 0, True, 'Purchase']] | Undone — back to how it was Saved — sales split by who bought what. Undo
+errors: []

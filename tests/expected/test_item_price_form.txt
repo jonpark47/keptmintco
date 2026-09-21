@@ -1,0 +1,9 @@
+title: Price for this item | rows: 1
+who: Jax | total: 16.15 | price: 16.15 | qty: 1 | replace ticked: False | scope: all
+summary: Items $16.15 · tax & fees $0.00 (0.0%) · you paid $16.15
+summary after edit: Items $15.00 · tax & fees $1.20 (8.0%) · you paid $16.20
+confirm: Jax paid $16.20 · 1 unit | Pokemon TCG 30th Anniversary Tech Sticker Collection Exeggutor - Sealed In Hand! | 1 × $15.00 + $1.20 tax & fees = $16.20 for 1 unit | $16.20 | each | These become the unit cost on Jax's batches of each item. An item with no batch for Jax gets one created. You can undo right after.
+after apply [Jon, Jax]: [['Jon', 16.15, True, None], ['Jax', 16.2, True, 15]] (Jon must stay 16.15, untouched)
+next time prefilled -> price: 15 | qty: 2 | total: 32.4
+general trip replace default: True | rows: 13
+errors: [] scrollW 390

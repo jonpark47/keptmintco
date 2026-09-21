@@ -1,0 +1,7 @@
+products raw: 15 cards shown: 13 | header: 13 items
+Lucario cards: 1
+Exeggutor cards: 1
+split line: Bought by Jon 2 Jax 1
+sale money: ['$25.66 | payout | profit $5.66', '$135.31 | payout | profit: add cost', '$20.21 | payout | profit: add cost', '$100.36 | payout | profit: add cost']
+tiles: ['YOUR PAYOUT | $1,189.87 | $0.00 available · $1,189.87 pending across 11 sales', 'YOUR PROFIT (INTERNAL) | $135.73 | so far, 5 sales still need a cost. Just for your own tracking. It never cha']
+scrollW 390 errors: []

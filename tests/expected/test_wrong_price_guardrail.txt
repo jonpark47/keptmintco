@@ -1,0 +1,4 @@
+WRONG entry -> The Legend of Zelda 40th Anniversary Nintendo Switch 2 Pro Controller - Preorder | 2 × $199.98 + $19.52 tax & fees = $439.00 for 2 units | Check this: it has sold for about $117.30 each, less than this cost. Is the price you typed for ONE unit, not the total for all 2? | $219.50 | each
+RIGHT entry -> The Legend of Zelda 40th Anniversary Nintendo Switch 2 Pro Controller - Preorder | 2 × $99.99 + $9.75 tax & fees = $219.48 for 2 units | $109.74 | each | warn shown: 0
+loss pills on Sales: 2
+errors: []

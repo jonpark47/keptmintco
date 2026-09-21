@@ -1,0 +1,6 @@
+owner link -> modal: Who gets this sale? | hash cleaned: #overview
+then: Assign to Jax?
+cost link -> modal: Price for this item | tab: inventory | hash: #inventory
+bad id -> toast: That sale is no longer in the ledger
+plain hash ok, modal: 1
+errors: []
