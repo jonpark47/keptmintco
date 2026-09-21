@@ -1701,6 +1701,44 @@
     return "<div class='section-head'><h2>Top earners</h2><button class='btn ghost' data-action='goto-insights'>Insights</button></div><div class='card'><div class='confirm-list'>"+
       top.map(function(r){ return "<div class='confirm-row'><span>"+esc(r.name)+"<small>"+r.sold+" sold · "+pct(r.roi)+" return</small></span><span>"+money(r.profit)+"</span></div>"; }).join("")+"</div></div>";
   }
+  // Where the money on one sale went: what the buyer paid, every fee eBay took, the label, refunds, and the payout. If
+  // eBay's own records disagree with the payout, it says so here (and a Discord card asks about it).
+  var FEE_NAMES = { FINAL_VALUE_FEE:"Final value fee", FINAL_VALUE_FEE_FIXED_PER_ORDER:"Per-order fee", INTERNATIONAL_FEE:"International fee",
+                    AD_FEE:"Promoted listings", INSERTION_FEE:"Listing fee", BELOW_STANDARD_FEE:"Below-standard fee" };
+  function feeName(k){ return FEE_NAMES[k] || (String(k).replace(/_/g," ").toLowerCase().replace(/^./, function(c){ return c.toUpperCase(); })); }
+  function openBreakdown(id){
+    var s = state.sales.concat(state.cancelled||[]).find(function(x){ return x.id===id; });
+    if (!s) return;
+    var p = productById(s.productId), row = function(label, val, cls){ return "<div class='confirm-row'><span>"+label+"</span><span"+(cls?" class='"+cls+"'":"")+">"+val+"</span></div>"; };
+    var rows = "";
+    var hasFin = s.buyerPaid != null;
+    if (hasFin){
+      var itemPart = s.soldPrice!=null ? Number(s.soldPrice) : null, ship = s.shipPaid!=null ? Number(s.shipPaid) : (itemPart!=null ? round2(Number(s.buyerPaid)-itemPart) : null);
+      if (itemPart!=null) rows += row("Item price", money(itemPart));
+      if (ship!=null && Math.abs(ship)>0.004) rows += row("Shipping paid by the buyer", money(ship));
+      rows += row("Buyer paid eBay (before tax)", money(s.buyerPaid));
+      var keys = Object.keys(s.feeBreakdown||{});
+      keys.forEach(function(k){ rows += row("&nbsp;&nbsp;"+esc(feeName(k)), "−"+money(s.feeBreakdown[k]).replace("-","")); });
+      rows += row("eBay fees, total", "−"+money(s.ebayFees).replace("-",""));
+      rows += row("eBay payout before the label", money(round2(Number(s.buyerPaid)-Number(s.ebayFees))));
+    } else {
+      rows += row("Payout before the label", money(Number(s.netProfit||0)+Number(s.labelCost||0)+Number(s.adFees||0)));
+      rows += "<div class='hint'>eBay has not reported the fee details for this sale yet.</div>";
+    }
+    var intl = s.shipCountry && ["US","GU","PR","VI","AS","MP","UM"].indexOf(s.shipCountry)===-1;
+    if (s.labelCost!=null) rows += row("Shipping label"+(s.labelEntered?" (you entered it)":""), "−"+money(s.labelCost).replace("-",""));
+    else if (!s.ebayShipped) rows += row("Shipping label", "<span class='sale-sub'>not bought yet</span>");
+    else rows += row("Shipping label", "<span class='sale-sub'>"+(intl ? "eBay does not report international labels" : "eBay has not reported it")+"</span>");
+    if (Number(s.adFees)>0.004) rows += row("Ad fee", "−"+money(s.adFees).replace("-",""));
+    if (Number(s.refundTotal)>0.004) rows += row("Refund", "−"+money(s.refundTotal).replace("-",""));
+    rows += row("<b>Payout</b>", "<b>"+money(s.netProfit)+"</b>");
+    var status = s.finDiff!=null && Math.abs(Number(s.finDiff))>0.05
+      ? "<div class='hint warn'>This payout is "+money(Math.abs(s.finDiff))+(s.finDiff<0?" lower":" higher")+" than eBay's own records add up to. A card in Discord asks whether that is right.</div>"
+      : (hasFin ? "<div class='hint'>Matches eBay's records.</div>" : "");
+    openModal("Where the money went",
+      "<div class='sale-sub' style='margin-bottom:8px'>"+esc(p?p.name:"Sale")+(s.buyerName?" · "+esc(s.buyerName):"")+"</div><div class='confirm-list'>"+rows+"</div>"+status,
+      "<button class='btn primary' data-action='close-modal'>Close</button>");
+  }
   function renderOverview(){
     var other = whoAmI === "Jon" ? "Jax" : "Jon";
     var myTied = cashTiedUp(whoAmI), otherTied = cashTiedUp(other);
@@ -2275,6 +2313,7 @@
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
       "<div class='sale-actions'>"+recvBtn+
         (s.createdBy==="ebay-sync" && s.orderNumber ? "<a class='btn small ghost' target='_blank' rel='noopener' href='https://www.ebay.com/sh/ord/details?orderid="+encodeURIComponent(s.orderNumber)+"'>eBay</a>" : "")+
+        "<button class='btn small ghost' data-action='sale-breakdown' data-id='"+s.id+"'>Breakdown</button>"+
         "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
         "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
       "</div></div>";
@@ -2632,6 +2671,7 @@
     if (action==="goto-inventory") return setTab("inventory");
     if (action==="goto-sales") return setTab("sales");
     if (action==="goto-insights") return setTab("insights");
+    if (action==="sale-breakdown") return openBreakdown(t.dataset.id);
     if (action==="ins-sort"){ insSort = t.dataset.f; render(); return; }
     if (action==="goto-preorders") return setTab("preorders");
 
