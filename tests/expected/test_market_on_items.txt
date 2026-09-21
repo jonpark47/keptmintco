@@ -1,0 +1,10 @@
+390 px, before any tracking: market lines: 0
+  market lines: 2
+  first: Market $X you $X · +135% vs market | sold 2 today · 9 this week · 31+ this month · 40 listed · updated 3 hr ago
+  second: Market: not enough sales on eBay to price it yet.
+  no sideways scroll: True | errors: []
+320 px, before any tracking: market lines: 0
+  market lines: 2
+  first: Market $X you $X · +135% vs market | sold 2 today · 9 this week · 31+ this month · 40 listed · updated 3 hr ago
+  second: Market: not enough sales on eBay to price it yet.
+  no sideways scroll: True | errors: []

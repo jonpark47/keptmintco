@@ -687,6 +687,8 @@
   .ins-profit.neg{ color:var(--danger, #d64545); }
   .ins-facts{ display:flex; flex-wrap:wrap; gap:4px 12px; color:var(--muted); font-size:13px; }
   .ins-facts span{ white-space:nowrap; }
+  .ins-market{ display:flex; flex-direction:column; gap:3px; padding-top:8px; border-top:1px solid var(--border); font-size:13px; }
+  .ins-market b{ font-variant-numeric:tabular-nums; }
   .ins-bar{ height:6px; border-radius:3px; background:var(--surface-2); overflow:hidden; }
   .ins-bar i{ display:block; height:100%; background:var(--tabc, #6a45ff); }
   .stk-row{ display:flex; flex-direction:column; gap:5px; }
@@ -850,7 +852,7 @@
   // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
   var AUTO_BATCH_NOTE = "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.";
 
-  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [] };
+  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [], market: {} };
   var memoStore = null;
   var db = null;
   var tab = "overview";
@@ -978,6 +980,7 @@
     sub("sales","sales");
     sub("settlements","settlements");
     sub("expenses","expenses");
+    db.collection("meta").doc("market").onSnapshot(function(d){ state.market = d.exists ? d.data() : {}; scheduleRender(); }, function(){});
     db.collection("meta").doc("ebay").onSnapshot(function(d){ syncMeta = d.exists ? d.data() : null; paintSyncPill(); }, function(){});
     setInterval(paintSyncPill, 30000);
   }
@@ -1649,18 +1652,34 @@
   function insightRows(){
     var costs = fifoCosts();
     return productGroupList().map(function(g){
-      var sold = 0, payout = 0, cQty = 0, cCost = 0, cPay = 0, unpriced = 0;
+      var sold = 0, payout = 0, cQty = 0, cCost = 0, cPay = 0, unpriced = 0, priceSum = 0, priceQty = 0;
       state.sales.forEach(function(s){
         if (g.pids.indexOf(s.productId)===-1) return;
         var q = Number(s.quantitySold||1), u = costs[s.id];
+        if (s.soldPrice!=null){ priceSum += Number(s.soldPrice); priceQty += q; }
         sold += q; payout += Number(s.netProfit||0);
         if (u==null) unpriced += q; else { cQty += q; cCost += u*q; cPay += Number(s.netProfit||0); }
       });
       var st = groupStock(g.pids), profit = cPay - cCost;
-      return { name:g.p.name, drop:dropOf(g.p.name), sold:sold, payout:payout, avgPayout: sold ? payout/sold : null,
+      return { key:g.key, avgSold: priceQty ? priceSum/priceQty : null, name:g.p.name, drop:dropOf(g.p.name), sold:sold, payout:payout, avgPayout: sold ? payout/sold : null,
                costedQty:cQty, avgCost: cQty ? cCost/cQty : null, profit:profit, roi: cCost>0 ? profit/cCost : null,
                unpriced:unpriced, onHand:Math.max(0, st.remaining), incoming:st.pipeline };
     }).filter(function(r){ return r.sold>0; });
+  }
+  // What the market says about one of YOUR items (the server tracks it daily once you said yes on the Discord card)
+  function marketHtml(r){
+    var m = state.market && state.market[r.key];
+    if (!m) return "";
+    if (m.cleared==null) return "<div class='ins-market'><div class='sale-sub'>Market: not enough sales on eBay to price it yet.</div></div>";
+    var cmp = "";
+    if (r.avgSold!=null && m.cleared>0){
+      var d = (r.avgSold - m.cleared)/m.cleared, txt = (d>=0?"+":"")+Math.round(d*100)+"% vs market";
+      cmp = " <span class='badge "+(d < -0.08 ? "label-note" : "qty")+"' title='what you sold it for, on average, against what the market cleared it at'>you "+money(r.avgSold)+" · "+txt+"</span>";
+    }
+    var n = function(v, tracked){ return v + (tracked ? "" : "+"); };
+    return "<div class='ins-market'><div><b>Market "+money(m.cleared)+"</b>"+cmp+"</div>"+
+      "<div class='sale-sub'>sold "+n(m.units1, m.tracked1)+" today · "+n(m.units7, m.tracked7)+" this week · "+n(m.units30, m.tracked30)+" this month"+
+      (m.supply ? " · "+m.supply+" listed" : "")+(m.at ? " · updated "+relTime(m.at) : "")+"</div></div>";
   }
   function pct(v){ return v==null ? "—" : (v>=0?"+":"")+Math.round(v*100)+"%"; }
   function renderInsights(){
@@ -1689,6 +1708,7 @@
         "<div class='ins-profit"+(neg?" neg":"")+"'>"+(known ? money(r.profit)+"<small>"+pct(r.roi)+" return</small>" : "<small>add cost</small>")+"</div></div>"+
         "<div class='ins-facts'><span>"+r.sold+" sold</span>"+(r.avgPayout!=null?"<span>avg payout "+money(r.avgPayout)+"</span>":"")+(r.avgCost!=null?"<span>avg cost "+money(r.avgCost)+"</span>":"")+
         (r.onHand?"<span>"+r.onHand+" on hand</span>":"")+(r.incoming?"<span>"+r.incoming+" incoming</span>":"")+"</div>"+
+        marketHtml(r)+
         (known && share<100 ? "<div class='ins-bar' title='share of sold units that have a cost'><i style='width:"+share+"%'></i></div><div class='sale-sub'>"+r.costedQty+" of "+r.sold+" sold units have a cost</div>" : "")+
         "</div>";
     }).join("")+"</div>";
