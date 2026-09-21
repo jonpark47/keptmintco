@@ -832,7 +832,7 @@
   // acknowledgment — Jon shouldn't have to separately go delete leftover auto-fill text too.
   var AUTO_BATCH_NOTE = "Auto-added to cover a sale — not yet received from the supplier. Cost unknown; edit with the real purchase cost once you know it.";
 
-  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [] };
+  var state = { products: [], batches: [], sales: [], settlements: [], cancelled: [], expenses: [] };
   var memoStore = null;
   var db = null;
   var tab = "overview";
@@ -959,6 +959,7 @@
     sub("batches","batches");
     sub("sales","sales");
     sub("settlements","settlements");
+    sub("expenses","expenses");
     db.collection("meta").doc("ebay").onSnapshot(function(d){ syncMeta = d.exists ? d.data() : null; paintSyncPill(); }, function(){});
     setInterval(paintSyncPill, 30000);
   }
@@ -1587,6 +1588,25 @@
     return "<div class='section-head'><h2>Payout by week</h2><span class='count'>last 8 weeks · "+money(total)+"</span></div>"+
       "<div class='card chart-card' role='img' aria-label='Bar chart of weekly payout for the last 8 weeks'><div class='wk-chart'>"+bars+"</div><div class='wk-labels'>"+labels+"</div></div>";
   }
+  // eBay charges that belong to no sale (promoted-listing ads, store fee, credits, adjustments). The sync
+  // records them as `expenses`; they are never part of a sale's payout, so they are shown apart and are
+  // not counted in the balance between Jon and Jax. Negative = eBay charged, positive = eBay credited.
+  function chargeLabel(x){
+    var t = String(x.feeType || x.kind || "charge").replace(/_/g, " ").toLowerCase();
+    if (x.feeType === "AD_FEE") t = "promoted listings";
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  }
+  function chargesCardHtml(){
+    var ex = state.expenses || [];
+    if (!ex.length) return "";
+    var now = new Date(), ym = now.getFullYear()+"-"+("0"+(now.getMonth()+1)).slice(-2), total = 0, month = 0;
+    ex.forEach(function(x){ var a = Number(x.amount||0); total += a; if (String(x.date||"").slice(0,7)===ym) month += a; });
+    var rows = ex.slice().sort(function(a,b){ return String(b.date||"").localeCompare(String(a.date||"")) || (b.createdAt||0)-(a.createdAt||0); }).slice(0,4).map(function(x){
+      return "<div class='confirm-row'><span>"+esc(chargeLabel(x))+"<small>"+fmtDate(x.date)+(x.memo?" · "+esc(x.memo):"")+"</small></span><span>"+money(x.amount)+"</span></div>";
+    }).join("");
+    return "<div class='section-head'><h2>eBay charges</h2><span class='count'>this month "+money(month)+" · all time "+money(total)+"</span></div>"+
+      "<div class='card'><div class='confirm-list'>"+rows+"</div><div class='hint'>Ads, store fees and credits that eBay does not tie to a sale. They are not in any sale's payout and not counted in the balance between you two.</div></div>";
+  }
   function renderOverview(){
     var other = whoAmI === "Jon" ? "Jax" : "Jon";
     var myTied = cashTiedUp(whoAmI), otherTied = cashTiedUp(other);
@@ -1597,7 +1617,7 @@
       "<div class='tile t-"+(other==="Jon"?"jon":"jax")+"'><div class='eyebrow'>"+other+"'s preorders</div><div class='value'>"+money(otherTied)+"</div><div class='sub'>committed, not in hand yet</div></div>"+
       "</div>";
 
-    html += payoutChartHtml() + dashCardsHtml();
+    html += payoutChartHtml() + chargesCardHtml() + dashCardsHtml();
     var latest = state.sales.slice().sort(bySaleNewest).slice(0,4);
     html += "<div class='section-head'><h2>Latest sales</h2><button class='btn ghost' data-action='goto-sales'>See all</button></div>";
     html += latest.length
