@@ -2,12 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>KeptMintCo</title>
 <meta name="theme-color" content="#6a45ff">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icon-192.png">
-<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon-v2.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="KeptMint">
@@ -274,7 +275,7 @@
     .bottom-tabbar{
       display:flex; position:fixed; left:0; right:0; bottom:0; z-index:40;
       background:var(--surface); border-top:1px solid var(--border);
-      padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+      padding:8px 4px calc(10px + max(env(safe-area-inset-bottom), 20px));
       box-shadow:0 -1px 8px rgba(0,0,0,.05);
     }
     .bottom-tabbar .navbtn{
@@ -285,7 +286,7 @@
     .bottom-tabbar .navbtn .ic{ width:22px; height:22px; }
     .bottom-tabbar .navbtn .ic svg{ width:20px; height:20px; }
     .bottom-tabbar .navbtn.active{ background:transparent; }
-    .main{ padding:18px 16px calc(76px + env(safe-area-inset-bottom)); }
+    .main{ padding:18px 16px calc(96px + max(env(safe-area-inset-bottom), 20px)); }
     .row2{ grid-template-columns:1fr; }
     .topbar h1{ font-size:24px; }
     .modal{ border-radius:16px 16px 0 0; max-height:92vh; }
