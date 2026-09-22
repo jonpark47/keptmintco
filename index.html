@@ -331,7 +331,7 @@
   .navbtn{ padding:7px 10px; border-radius:14px; font-weight:600; color:var(--muted); transition:background .15s, transform .15s; }
   .navbtn[data-tab="overview"]{ --tabc:#6a45ff; } .navbtn[data-tab="inventory"]{ --tabc:#0fb5a5; }
   .navbtn[data-tab="preorders"]{ --tabc:#ff8a1f; } .navbtn[data-tab="sales"]{ --tabc:#0aa877; }
-  .navbtn[data-tab="settlements"]{ --tabc:#ee2f8a; }
+  .navbtn[data-tab="settlements"]{ --tabc:#ee2f8a; } .navbtn[data-tab="insights"]{ --tabc:#6a45ff; }
   .navbtn .ic{ width:32px; height:32px; border-radius:10px; background:color-mix(in srgb,var(--tabc) 16%, transparent); color:var(--tabc); transition:all .15s; }
   .navbtn .ic svg{ width:17px; height:17px; }
   .navbtn:hover{ background:var(--surface); transform:translateX(2px); color:var(--ink); }
@@ -817,6 +817,7 @@
       <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span> Costs</button>
       <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span> Sales</button>
       <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span> Settlements</button>
+      <button class="navbtn" data-tab="insights"><span class="ic" data-icon="insights"></span> Insights</button>
     </div>
     <div class="nav-foot">Shared live ledger for Jon &amp; Jax's flips.</div>
   </nav>
@@ -825,6 +826,7 @@
     <button class="navbtn" data-tab="inventory"><span class="ic" data-icon="inventory"></span><span>Costs</span></button>
     <button class="navbtn" data-tab="sales"><span class="ic" data-icon="sales"></span><span>Sales</span></button>
     <button class="navbtn" data-tab="settlements"><span class="ic" data-icon="settlements"></span><span>Settlements</span></button>
+    <button class="navbtn" data-tab="insights"><span class="ic" data-icon="insights"></span><span>Insights</span></button>
   </nav>
   <main class="main">
     <div class="topbar">
@@ -888,6 +890,7 @@
     orders: '<path d="M4 8h3l1.4-2h7.2L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.3"/>',
     sales: '<path d="M20 12.5l-7.5 7.5-9-9V4h9z"/><circle cx="7.2" cy="7.2" r="1" fill="currentColor" stroke="none"/>',
     settlements: '<path d="M7 8h11l-3-3M17 16H6l3 3"/>',
+    insights: '<path d="M4 19h16"/><path d="M7 19V11M12 19V6M17 19V14"/><circle cx="12" cy="6" r="1.4" fill="currentColor" stroke="none"/><circle cx="17" cy="14" r="1.4" fill="currentColor" stroke="none"/><circle cx="7" cy="11" r="1.4" fill="currentColor" stroke="none"/>',
     plus: '<path d="M12 5v14M5 12h14"/>',
     receipt: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6"/>',
     coin: '<circle cx="12" cy="12" r="9"/><path d="M14.5 9.2c-.4-.8-1.3-1.2-2.5-1.2-1.5 0-2.5.7-2.5 1.8s1 1.5 2.5 1.8 2.5.7 2.5 1.8-1 1.8-2.5 1.8c-1.2 0-2.1-.4-2.5-1.2M12 6.5V8M12 16v1.5"/>',
