@@ -2548,6 +2548,8 @@
       "<div class='field'><label>Sold price (optional)</label><input id='f_price' type='number' step='0.01' value='"+(s.soldPrice||"")+"'></div></div>"+
       "<div class='row2'><div class='field'><label>Buyer username</label><input id='f_buyer' type='text' value='"+esc(s.buyerName||"")+"'></div>"+
       "<div class='field'><label>Order #</label><input id='f_ordernum' type='text' value='"+esc(s.orderNumber||"")+"'></div></div>"+
+      "<div class='field'><label>Shipping label ($) <span class='opt'>optional, leave blank to not change it</span></label><input id='f_label' type='number' min='0' step='0.01' placeholder='"+(s.labelCost!=null?money(s.labelCost):"not entered")+"'>"+
+      "<div class='hint'>A record only -- change the Payout box above if the total itself needs to change.</div></div>"+
       "<div class='row2'><div class='field'><label>Goes to</label><select id='f_who'>"+ownerOptionsNone(s.attributedTo)+"</select></div>"+
       "<div class='field'><label>Funds status</label><select id='f_funds'>"+
         "<option value='pending'"+(s.lifecycleStatus!=="completed"?" selected":"")+">Pending payout</option>"+
@@ -2776,6 +2778,7 @@
       if (editWho && prevSale.attributedTo && editWho !== prevSale.attributedTo){
         batchesForSale(sid).forEach(function(b){ updateBatch(b.id, { owner: editWho }); }); // its stock follows it, like the owner tap
       }
+      var labelRaw = $("#f_label").value;
       updateSale(sid, Object.assign({
         productId: editPid, quantitySold: editQty,
         saleDate: editDate, netProfit: ($("#f_profit").value==="" && prevSale.netProfit==null) ? null : (Number($("#f_profit").value)||0),
@@ -2784,7 +2787,7 @@
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
         lifecycleStatus: editFundsVal
-      }, editExtra(prevSale, editWho, Number($("#f_profit").value)||0)));
+      }, editExtra(prevSale, editWho, Number($("#f_profit").value)||0), labelRaw!=="" ? { labelCost: Number(labelRaw)||0, labelEntered: true, profitSource: "manual", finDiff: null, finExpected: null, finDiffAck: null } : {}));
       (editWho ? syncStockForSale(editPid, editQty, editWho, editDate, sid, sid) : Promise.resolve()).then(function(){
         // Same reasoning as submit-add-sale above: a payout marked "Completed" here (including
         // editing an OLDER sale up to that status after the fact) is proof enough on its own.
