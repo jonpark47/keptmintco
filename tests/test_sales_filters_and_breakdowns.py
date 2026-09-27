@@ -92,25 +92,29 @@ try:
         print("Your payout modal rows:", pg.locator(".modal-body .sale-row").count(), "| want", len(jon))
         pg.click(".modal-foot button[data-action='close-modal']")
 
-        # ---- "Record payment": live, card-by-card preview of exactly what THIS amount covers --
-        # not a blind number. row1/row2 below are the two still-outstanding sales (partial + owed).
-        row1_owed = round(paid_jon[2]["netProfit"] / 2, 2)  # the partially-settled one
-        row2_owed = round(paid_jon[3]["netProfit"], 2)      # the untouched one
+        # ---- "Record payment": a checklist of the exact cards this payment covers, checked by
+        # default (the two still-outstanding sales, partial + owed), driving the Amount live --
+        # not a blind number, and searchable in case the default FIFO guess is wrong.
         pg.click("button[data-action='open-add-settlement']")
         print("default from/to/amount:", pg.input_value("#f_from"), pg.input_value("#f_to"), pg.input_value("#f_amount"), "| want amount", still_owed)
-        def coverage_tags():
-            return pg.eval_on_selector_all("#settlementCoverage .sale-row .badge.settle-done, #settlementCoverage .sale-row .badge.settle-partial, #settlementCoverage .sale-row .badge.settle-owed",
-                "els => els.map(e => e.textContent.trim())")
-        print("coverage at the default (fully owed) amount:", coverage_tags(), "| want both 'Fully covered by this payment'")
-        print("coverage cards have no Edit/Remove (read-only preview):", pg.locator("#settlementCoverage .sale-actions").count())
-        pg.fill("#f_amount", "0")
-        print("coverage at $0:", coverage_tags(), "| want both 'Not covered by this payment'")
-        pg.fill("#f_amount", str(round(row1_owed + row2_owed / 2, 2)))
-        print("coverage at row1 + half of row2:", coverage_tags(), "| want first row fully covered, second row a partial 'Covers' badge")
+        checked_ids = lambda: pg.eval_on_selector_all("#settlementCoverage .cov-chk:checked", "els => els.length")
+        print("checklist starts with both outstanding cards checked:", checked_ids(), "| no Edit/Remove on them:", pg.locator("#settlementCoverage .sale-actions").count())
+        pg.locator("#settlementCoverage .cov-chk").nth(1).uncheck()
+        print("unchecking the 2nd card drops it and updates Amount live:", checked_ids(), pg.input_value("#f_amount"))
+        pg.locator("#settlementCoverage .cov-chk").nth(1).check()
+        print("re-checking restores the full amount:", checked_ids(), pg.input_value("#f_amount"))
+        # search finds an ALREADY-settled order too (not shown by default) -- checking it adds its
+        # full payout on top, for the rare case the automatic FIFO guess needs a manual correction
+        settled_sale = paid_jon[0]
+        pg.fill("#covSearch", settled_sale["buyerName"]); pg.wait_for_timeout(150)
+        found = pg.locator("#settlementCoverage .sale-row").count()
+        pg.locator("#settlementCoverage .cov-chk").first.check()
+        print("search found the settled order and checking it raised Amount:", found, pg.input_value("#f_amount"))
+        pg.fill("#covSearch", "")
         pg.select_option("#f_from", "Jon"); pg.select_option("#f_to", "Jax")
-        print("flip to Jon -> Jax, coverage hides:", pg.inner_text("#settlementCoverage").strip() == "")
+        print("flip to Jon -> Jax, checklist hides:", pg.inner_text("#settlementCoverage").strip() == "", "| search field hides too:", not pg.is_visible("#covSearchField"))
         pg.select_option("#f_from", "Jax"); pg.select_option("#f_to", "Jon")
-        print("flip back, coverage returns:", len(coverage_tags()) == 2)
+        print("flip back, selection was preserved (not reset):", checked_ids())
         pg.click("button[data-action='close-modal']")
 
         print("errors:", errs, "| scrollW", pg.evaluate("document.documentElement.scrollWidth"))

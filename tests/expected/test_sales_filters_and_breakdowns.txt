@@ -14,10 +14,10 @@ Enter on debt tile opens modal: True
 Escape closes it: 0
 Your payout modal rows: 11 | want 11
 default from/to/amount: Jax Jon 155.12 | want amount 155.12
-coverage at the default (fully owed) amount: ['Fully covered by this payment', 'Fully covered by this payment'] | want both 'Fully covered by this payment'
-coverage cards have no Edit/Remove (read-only preview): 0
-coverage at $0: ['Not covered by this payment', 'Not covered by this payment'] | want both 'Not covered by this payment'
-coverage at row1 + half of row2: ['Fully covered by this payment', 'Covers $70.07 of $118.11'] | want first row fully covered, second row a partial 'Covers' badge
-flip to Jon -> Jax, coverage hides: True
-flip back, coverage returns: True
+checklist starts with both outstanding cards checked: 2 | no Edit/Remove on them: 0
+unchecking the 2nd card drops it and updates Amount live: 1 118.11
+re-checking restores the full amount: 2 155.12
+search found the settled order and checking it raised Amount: 1 350.78
+flip to Jon -> Jax, checklist hides: True | search field hides too: True
+flip back, selection was preserved (not reset): 2
 errors: [] | scrollW 390
