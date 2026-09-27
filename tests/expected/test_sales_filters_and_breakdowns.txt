@@ -2,6 +2,7 @@ dropdown options, status: ['All (20)', 'Pending payout (14)', 'Paid out (6)', 'U
 dropdown options, owner: ['Everyone (20)', 'Jon (11)', 'Jax (6)']
 paid+Jon: rows 4 | want 4
 summary: 4 sales shown · $645.66 net | want total 645.66
+inline settle badges on the Sales list: ['settle-owed', 'settle-partial', 'settle-done', 'settle-done'] | still all show the separate 'Paid out' pill too: True
 paid+Jax: rows 2 | want 2
 pending+Jax: rows 4 | want 4
 tap 'Paid out' tile -> status: paid | owner reset: all
@@ -12,4 +13,11 @@ debt modal footer: 4 orders · $155.12 still owed Close | want still-owed total 
 Enter on debt tile opens modal: True
 Escape closes it: 0
 Your payout modal rows: 11 | want 11
+default from/to/amount: Jax Jon 155.12 | want amount 155.12
+coverage at the default (fully owed) amount: ['Fully covered by this payment', 'Fully covered by this payment'] | want both 'Fully covered by this payment'
+coverage cards have no Edit/Remove (read-only preview): 0
+coverage at $0: ['Not covered by this payment', 'Not covered by this payment'] | want both 'Not covered by this payment'
+coverage at row1 + half of row2: ['Fully covered by this payment', 'Covers $70.07 of $118.11'] | want first row fully covered, second row a partial 'Covers' badge
+flip to Jon -> Jax, coverage hides: True
+flip back, coverage returns: True
 errors: [] | scrollW 390

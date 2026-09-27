@@ -1155,6 +1155,13 @@
     });
     return { rows: rows, unallocated: round2(remaining) };
   }
+  // Keyed by sale id, for tagging a specific row wherever it shows (the main Sales list, or a
+  // drill-down list) without re-running the allocation per row.
+  function jonDebtStatusMap(){
+    var m = {};
+    jonDebtAllocation().rows.forEach(function(r){ m[r.sale.id] = r; });
+    return m;
+  }
   // bal > 0 means Jax owes Jon. Phrased from `viewer`'s own point of view, not third-person.
   function balanceLine(bal, viewer){
     var other = viewer === "Jon" ? "Jax" : "Jon";
@@ -1860,9 +1867,11 @@
       "<button class='btn primary' data-action='close-modal'>Close</button>";
     openModal(title, body, foot, { wide:true });
   }
+  // Deliberately worded away from "Paid out" (that pill means eBay paid Jax; this one means Jax
+  // has, separately, handed that money to Jon) -- the two must never look like the same fact.
   function settleBadge(status, settledAmount){
-    if (status==="settled") return "<span class='badge settle-done'>Paid out to you</span>";
-    if (status==="partial") return "<span class='badge settle-partial'>Partially paid — "+money(settledAmount)+" so far</span>";
+    if (status==="settled") return "<span class='badge settle-done'>Already settled to you</span>";
+    if (status==="partial") return "<span class='badge settle-partial'>Partially settled — "+money(settledAmount)+" so far</span>";
     return "<span class='badge settle-owed'>Still owed to you</span>";
   }
   // "Available to settle now" tile -- exactly which of Jon's paid-out sales Jax has already
@@ -1876,8 +1885,14 @@
     openSalesListModal("What Jax still owes you", entries, { sumField:"owedAmount", sumLabel:"still owed", note:note, emptyMsg:"Nothing has paid out to Jon yet." });
   }
   // "Your payout" / "Pending payout" tiles -- every one of that owner's sales matching the tile.
+  // Jon's own paid sales also carry the same settled/owed tag the debt tile shows, so this list
+  // and that one can never quietly disagree about which orders are covered.
   function openOwnerSalesBreakdown(title, owner, statusFilter, emptyMsg){
-    var entries = ownerSalesList(owner, statusFilter).map(function(s){ return { sale:s }; });
+    var debtMap = owner === "Jon" ? jonDebtStatusMap() : {};
+    var entries = ownerSalesList(owner, statusFilter).map(function(s){
+      var d = debtMap[s.id];
+      return { sale:s, badge: d ? settleBadge(d.status, d.settledAmount) : "" };
+    });
     openSalesListModal(title, entries, { emptyMsg: emptyMsg });
   }
   function renderOverview(){
@@ -2377,7 +2392,12 @@
   // extraBadge is optional (a settle-status pill for the debt/payout drill-down modals below) --
   // guarded against being a string so Array#map's (element, index) second argument can never leak
   // in as a badge when this is used directly as a map callback (shown.slice(0, salesShown).map(saleRow)).
-  function saleRow(s, extraBadge){
+  // noActions (must be === true, not just truthy -- map's 3rd callback argument is the array
+  // itself, which would otherwise trip this) drops Breakdown/Edit/Remove: used only inside the
+  // "Record payment" preview, where tapping Edit would silently swap out the in-progress payment
+  // form for the sale editor and lose whatever was typed -- that list is for confirming what a
+  // payment covers, not for editing sales.
+  function saleRow(s, extraBadge, noActions){
     if (typeof extraBadge !== "string") extraBadge = "";
     if (s.orderState === "cancelled") return cancelledRow(s);
     var p = productById(s.productId);
@@ -2396,12 +2416,12 @@
       "</div>"+
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
-      "<div class='sale-actions'>"+recvBtn+
+      (noActions===true ? "" : "<div class='sale-actions'>"+recvBtn+
         (s.createdBy==="ebay-sync" && s.orderNumber ? "<a class='btn small ghost' target='_blank' rel='noopener' href='https://www.ebay.com/sh/ord/details?orderid="+encodeURIComponent(s.orderNumber)+"'>eBay</a>" : "")+
         "<button class='btn small ghost' data-action='sale-breakdown' data-id='"+s.id+"'>Breakdown</button>"+
         "<button class='btn small ghost' data-action='edit-sale' data-id='"+s.id+"'>Edit</button>"+
         "<button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button>"+
-      "</div></div>";
+      "</div>")+"</div>";
   }
 
   function renderSales(){
@@ -2481,7 +2501,13 @@
     var sumNet = shown.reduce(function(a,sa){ return a + (sa.orderState==="cancelled" ? 0 : Number(sa.netProfit||0)); }, 0);
     html += "<div class='filter-summary'>"+shown.length+" sale"+(shown.length===1?"":"s")+" shown <b>·</b> <b>"+money(sumNet)+"</b> net</div>";
     if (!shown.length) return html + "<div class='card empty'><div class='ic' data-icon='search'></div>No sales match that. Clear the search or pick another filter.</div>";
-    return html + "<div class='sales-list'>"+shown.slice(0, salesShown).map(saleRow).join("")+"</div>"+
+    // Separate from the "Paid out" pill (that one is eBay -> Jax): a paid-out sale of Jon's also
+    // shows whether Jax has actually handed HIM that money yet, same wording as the debt tile.
+    var debtMap = jonDebtStatusMap();
+    return html + "<div class='sales-list'>"+shown.slice(0, salesShown).map(function(sa){
+      var d = debtMap[sa.id];
+      return saleRow(sa, d ? settleBadge(d.status, d.settledAmount) : "");
+    }).join("")+"</div>"+
       (shown.length > salesShown ? "<div class='more-wrap'><button class='btn' data-action='sales-more'>Show "+Math.min(30, shown.length-salesShown)+" more · "+(shown.length-salesShown)+" left</button></div>" : "");
   }
   // every sale (and cancelled ones, marked) as a spreadsheet: for taxes and your own records
@@ -2714,9 +2740,35 @@
       "<div class='field'><label>To</label><select id='f_to'>"+ownerOptions(toWho)+"</select></div></div>"+
       "<div class='row2'><div class='field'><label>Amount</label><input id='f_amount' type='number' min='0' step='0.01' inputmode='decimal' value='"+owed+"' required>"+(owed ? "<div class='hint'>Filled in with what is owed right now.</div>" : "")+"</div>"+
       "<div class='field'><label>Date</label><input id='f_date' type='date' value='"+todayISO()+"'></div></div>"+
-      "<div class='field'><label>Note</label><textarea id='f_note' placeholder='e.g. Venmo for Sept payouts'></textarea></div>",
-      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-add-settlement'>Save payment</button>"
+      "<div class='field'><label>Note</label><textarea id='f_note' placeholder='e.g. Venmo for Sept payouts'></textarea></div>"+
+      "<div id='settlementCoverage'></div>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-add-settlement'>Save payment</button>",
+      { wide:true }
     );
+    updateSettlementCoverage();
+  }
+  // Live, as the amount is typed: exactly which of Jon's still-owed paid-out orders THIS payment
+  // would cover, oldest-first -- so recording a payment is never a blind dollar figure. Only shown
+  // for a Jax -> Jon payment, the one direction that is actually settling specific orders (the
+  // reverse direction is Jon paying Jax something else -- nothing here to show cards for).
+  function updateSettlementCoverage(){
+    var el = $("#settlementCoverage");
+    if (!el) return;
+    var from = $("#f_from") ? $("#f_from").value : "", to = $("#f_to") ? $("#f_to").value : "";
+    if (from !== "Jax" || to !== "Jon"){ el.innerHTML = ""; return; }
+    var outstanding = jonDebtAllocation().rows.filter(function(r){ return r.status !== "settled"; });
+    if (!outstanding.length){ el.innerHTML = "<div class='hint' style='margin-top:12px'>Every one of Jon's paid-out sales is already settled -- nothing to cover.</div>"; return; }
+    var amt = Number(($("#f_amount") || {}).value || 0), remaining = amt;
+    var rows = outstanding.map(function(r){
+      var covers = round2(Math.min(Math.max(remaining, 0), r.owedAmount));
+      remaining = round2(remaining - covers);
+      var tag = covers <= 0.005 ? "<span class='badge settle-owed'>Not covered by this payment</span>"
+        : covers >= r.owedAmount - 0.005 ? "<span class='badge settle-done'>Fully covered by this payment</span>"
+        : "<span class='badge settle-partial'>Covers "+money(covers)+" of "+money(r.owedAmount)+"</span>";
+      return saleRow(r.sale, tag, true);
+    }).join("");
+    var leftover = remaining > 0.005 ? "<div class='hint'>"+money(remaining)+" of this is more than what's currently owed on these orders.</div>" : "";
+    el.innerHTML = "<div class='hint' style='margin:12px 0 6px'>Exactly which orders this settles, oldest paid first:</div><div class='pay-list'>"+rows+"</div>"+leftover;
   }
 
   // Native window.confirm()/prompt() get silently swallowed by this platform's sandbox —
@@ -2989,6 +3041,7 @@
     }
     if (e.target && e.target.id === "salesStatusSelect"){ salesFilter = e.target.value; salesShown = 30; render(); }
     if (e.target && e.target.id === "salesOwnerSelect"){ salesOwner = e.target.value; salesShown = 30; render(); }
+    if (e.target && (e.target.id === "f_from" || e.target.id === "f_to")) updateSettlementCoverage();
   });
   var searchTimer = null;
   document.addEventListener("input", function(e){
@@ -2997,6 +3050,7 @@
       if (e.target.classList.contains("trip-price") && e.target.value !== "") clearTripFlag(e.target.closest(".trip-row"));
       updateTripSummary(); return;
     }
+    if (id === "f_amount"){ updateSettlementCoverage(); return; }
     if (id !== "salesSearch" && id !== "invSearch") return;
     clearTimeout(searchTimer);
     searchTimer = setTimeout(function(){

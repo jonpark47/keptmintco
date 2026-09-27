@@ -47,6 +47,12 @@ try:
         pg.select_option("#salesOwnerSelect", "Jon")
         print("paid+Jon: rows", pg.locator(".sale-row").count(), "| want", len(paid_jon))
         print("summary:", pg.inner_text(".filter-summary").replace("\n", " "), "| want total", jon_paid_total)
+        # the settle status shows right on the main list too, separate from the "Paid out" pill --
+        # not only inside the debt drill-down modal
+        row_badges = pg.eval_on_selector_all(".sales-list .sale-row .badge.settle-done, .sales-list .sale-row .badge.settle-partial, .sales-list .sale-row .badge.settle-owed",
+            "els => els.map(e => e.className.match(/settle-\\w+/)[0])")
+        pay_pills = pg.locator(".sales-list .sale-row .badge.lifecycle-completed").count()
+        print("inline settle badges on the Sales list:", row_badges, "| still all show the separate 'Paid out' pill too:", pay_pills == len(paid_jon))
         pg.select_option("#salesOwnerSelect", "Jax")
         print("paid+Jax: rows", pg.locator(".sale-row").count(), "| want", len(paid_jax))
         pg.select_option("#salesStatusSelect", "pending")
@@ -85,6 +91,27 @@ try:
         pg.click(".tile[data-action='open-owner-breakdown'][data-owner='Jon']")
         print("Your payout modal rows:", pg.locator(".modal-body .sale-row").count(), "| want", len(jon))
         pg.click(".modal-foot button[data-action='close-modal']")
+
+        # ---- "Record payment": live, card-by-card preview of exactly what THIS amount covers --
+        # not a blind number. row1/row2 below are the two still-outstanding sales (partial + owed).
+        row1_owed = round(paid_jon[2]["netProfit"] / 2, 2)  # the partially-settled one
+        row2_owed = round(paid_jon[3]["netProfit"], 2)      # the untouched one
+        pg.click("button[data-action='open-add-settlement']")
+        print("default from/to/amount:", pg.input_value("#f_from"), pg.input_value("#f_to"), pg.input_value("#f_amount"), "| want amount", still_owed)
+        def coverage_tags():
+            return pg.eval_on_selector_all("#settlementCoverage .sale-row .badge.settle-done, #settlementCoverage .sale-row .badge.settle-partial, #settlementCoverage .sale-row .badge.settle-owed",
+                "els => els.map(e => e.textContent.trim())")
+        print("coverage at the default (fully owed) amount:", coverage_tags(), "| want both 'Fully covered by this payment'")
+        print("coverage cards have no Edit/Remove (read-only preview):", pg.locator("#settlementCoverage .sale-actions").count())
+        pg.fill("#f_amount", "0")
+        print("coverage at $0:", coverage_tags(), "| want both 'Not covered by this payment'")
+        pg.fill("#f_amount", str(round(row1_owed + row2_owed / 2, 2)))
+        print("coverage at row1 + half of row2:", coverage_tags(), "| want first row fully covered, second row a partial 'Covers' badge")
+        pg.select_option("#f_from", "Jon"); pg.select_option("#f_to", "Jax")
+        print("flip to Jon -> Jax, coverage hides:", pg.inner_text("#settlementCoverage").strip() == "")
+        pg.select_option("#f_from", "Jax"); pg.select_option("#f_to", "Jon")
+        print("flip back, coverage returns:", len(coverage_tags()) == 2)
+        pg.click("button[data-action='close-modal']")
 
         print("errors:", errs, "| scrollW", pg.evaluate("document.documentElement.scrollWidth"))
         b.close()
