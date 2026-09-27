@@ -27,7 +27,7 @@ try:
             print(w, "px, rows in the main list:", rows.count(), "| cancelled rows:", pg.locator(".sale-row.cancelled").count())
             print("  red Cancelled badges:", pg.locator(".sale-row.cancelled .badge.cancel-red", has_text="Cancelled").count())
             print("  net notes:", [t.replace("\n", " ") for t in pg.locator(".sale-row.cancelled .sale-tags").all_inner_texts()])
-            print("  chip All count:", pg.locator(".fchip.on").first.inner_text().replace("\n", " "))
+            print("  status dropdown 'All' option:", pg.eval_on_selector("#salesStatusSelect option[value='all']", "e => e.textContent"))
             print("  totals unchanged by cancelled ones:", pg.locator(".tiles.mini .tile").first.inner_text().replace("\n", " | "))
             print("  no sideways scroll:", pg.evaluate("document.documentElement.scrollWidth <= window.innerWidth"), "| errors:", errs)
             pg.close()

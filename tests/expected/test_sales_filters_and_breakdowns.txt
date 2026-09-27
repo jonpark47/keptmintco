@@ -1,0 +1,15 @@
+dropdown options, status: ['All (20)', 'Pending payout (14)', 'Paid out (6)', 'Unassigned (3)', 'Missing cost (14)']
+dropdown options, owner: ['Everyone (20)', 'Jon (11)', 'Jax (6)']
+paid+Jon: rows 4 | want 4
+summary: 4 sales shown · $645.66 net | want total 645.66
+paid+Jax: rows 2 | want 2
+pending+Jax: rows 4 | want 4
+tap 'Paid out' tile -> status: paid | owner reset: all
+Overview 'Pending payout' tile -> tab: sales | status: pending
+debt modal open, tab unchanged: True
+debt allocation badges, oldest-paid-first: ['settle-done', 'settle-done', 'settle-partial', 'settle-owed'] | want first 2 settled, 1 partial, rest owed
+debt modal footer: 4 orders · $155.12 still owed Close | want still-owed total 155.12
+Enter on debt tile opens modal: True
+Escape closes it: 0
+Your payout modal rows: 11 | want 11
+errors: [] | scrollW 390

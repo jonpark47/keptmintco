@@ -364,8 +364,9 @@
   .tile .eyebrow{ color:rgba(255,255,255,.88); text-transform:uppercase; letter-spacing:.09em; font-size:11px; font-weight:700; }
   .tile .value{ font-family:var(--display); font-size:42px; font-weight:800; letter-spacing:-.035em; margin-top:6px; color:#fff; font-variant-numeric:tabular-nums; }
   .tile .sub{ color:rgba(255,255,255,.9); font-size:13px; }
-  .tile .btn.ghost{ margin-top:12px; color:#fff; background:rgba(255,255,255,.18); }
-  .tile .btn.ghost:hover{ background:rgba(255,255,255,.28); }
+  .tile[role="button"]{ cursor:pointer; }
+  .tile .tap-hint{ margin-top:10px; font-size:12px; font-weight:700; color:rgba(255,255,255,.95); }
+  button.tile{ appearance:none; -webkit-appearance:none; text-align:left; display:block; width:100%; box-sizing:border-box; font:inherit; cursor:pointer; }
   .tiles .tile:nth-child(2){ background:var(--g-jon); --glow:rgba(37,99,255,.7); }
   .tiles .tile:nth-child(3){ background:var(--g-jax); --glow:rgba(224,32,138,.65); }
   .tiles .tile:nth-child(4){ background:var(--g-pending); --glow:rgba(255,120,40,.65); }
@@ -404,6 +405,8 @@
   .badge.status-preorder, .badge.lifecycle-pending, .badge.review{ background:var(--warn-soft); color:var(--warn); }
   .badge.status-transit{ background:var(--accent-soft); color:var(--accent); }
   .badge.label-note{ background:var(--surface-2); color:var(--muted); font-weight:600; }
+  .badge.settle-done{ background:var(--good-soft); color:var(--good); }
+  .badge.settle-owed, .badge.settle-partial{ background:var(--warn-soft); color:var(--warn); }
 
   .empty{ padding:52px 24px; }
   .empty .ic{ width:64px; height:64px; margin:0 auto 14px; border-radius:20px; background:var(--tabg); color:#fff; box-shadow:0 14px 26px -12px var(--tabc); }
@@ -624,6 +627,13 @@
   .fchip b{ margin-left:6px; opacity:.65; font-weight:600; font-variant-numeric:tabular-nums; }
   .fchip.on{ background:var(--tabg, var(--accent)); color:#fff; border-color:transparent; }
   .fchip.on b{ opacity:.85; }
+  /* two dropdowns instead of a shelf of chips -- same combinable filter, a lot less visual noise */
+  .filter-row{ display:flex; gap:8px; flex-wrap:wrap; }
+  .fselect{ flex:1 1 160px; min-width:140px; min-height:40px; box-sizing:border-box; font:inherit; font-size:13.5px; font-weight:600;
+    padding:8px 30px 8px 12px; border-radius:12px; border:1px solid var(--border); background-color:var(--surface); color:var(--ink); }
+  .fselect:focus{ border-color:var(--accent); }
+  .filter-summary{ font-size:13px; font-weight:600; color:var(--muted); margin:2px 0 14px; }
+  .filter-summary b{ color:var(--ink); font-variant-numeric:tabular-nums; }
   .more-wrap{ display:flex; justify-content:center; margin:16px 0 4px; }
   .sk{ background:linear-gradient(90deg, var(--surface-2) 25%, var(--surface) 50%, var(--surface-2) 75%); background-size:200% 100%; animation:skshimmer 1.4s ease-in-out infinite; border-radius:20px; }
   @keyframes skshimmer{ to{ background-position:-200% 0; } }
@@ -1109,6 +1119,41 @@
       else available += Number(s.netProfit||0);
     });
     return { total: available+pending, available: available, pending: pending, pendingCount: pendingCount };
+  }
+  function ownerSalesList(owner, statusFilter){
+    return state.sales.filter(function(s){
+      if (s.attributedTo !== owner) return false;
+      if (statusFilter === "pending") return s.lifecycleStatus === "pending";
+      if (statusFilter === "paid") return s.lifecycleStatus === "completed";
+      return true;
+    }).sort(bySaleNewest);
+  }
+  // "Which of Jon's paid-out sales did Jax already hand over, and which does he still owe?"
+  // Nothing in the data model marks one sale "settled" -- a settlement is just a dollar amount
+  // (see addSettlement/computeBalance above), never tied to a specific order -- so this is an
+  // ALLOCATION, not a stored fact: every settlement dollar is applied against Jon's paid-out
+  // sales oldest-first (the same earliest-first rule already used for cost FIFO), until the
+  // settled total runs out. The sum of every row's owedAmount always equals computeBalance()
+  // when that is positive (Jax owes Jon) -- that identity is what test_debt_allocation.py checks
+  // -- and `unallocated` (rare: Jon has been paid ahead of these specific sales) covers the one
+  // case it doesn't, so the two numbers never quietly drift apart.
+  function jonDebtAllocation(){
+    var paid = state.sales.filter(function(s){ return s.attributedTo === "Jon" && s.lifecycleStatus === "completed"; })
+      .sort(function(a,b){ return (Date.parse(a.saleDate)||0) - (Date.parse(b.saleDate)||0) || (a.createdAt||0) - (b.createdAt||0); });
+    var settledTotal = 0;
+    state.settlements.forEach(function(t){
+      if (t.from === "Jax" && t.to === "Jon") settledTotal += Number(t.amount||0);
+      else if (t.from === "Jon" && t.to === "Jax") settledTotal -= Number(t.amount||0);
+    });
+    var remaining = Math.max(0, settledTotal);
+    var rows = paid.map(function(s){
+      var amt = round2(Number(s.netProfit||0));
+      var applied = round2(Math.min(remaining, amt));
+      remaining = round2(remaining - applied);
+      var status = applied >= amt - 0.005 ? "settled" : (applied > 0.005 ? "partial" : "owed");
+      return { sale: s, settledAmount: applied, owedAmount: round2(amt - applied), status: status };
+    });
+    return { rows: rows, unallocated: round2(remaining) };
   }
   // bal > 0 means Jax owes Jon. Phrased from `viewer`'s own point of view, not third-person.
   function balanceLine(bal, viewer){
@@ -1796,12 +1841,55 @@
       "<div class='sale-sub' style='margin-bottom:8px'>"+esc(p?p.name:"Sale")+(s.buyerName?" · "+esc(s.buyerName):"")+"</div><div class='confirm-list'>"+rows+"</div>"+status,
       "<button class='btn primary' data-action='close-modal'>Close</button>");
   }
+  // Every "here's a dollar figure" tile behind Settlements (and both partners' payout totals)
+  // opens to this: the actual list of orders that add up to it, each still carrying its own
+  // Breakdown/Edit/eBay-link buttons (reuses saleRow() itself, not a stripped-down copy), so a
+  // number is never the end of the trail -- it can always be walked back to specific orders.
+  function openSalesListModal(title, entries, opts){
+    opts = opts || {};
+    if (!entries.length){
+      openModal(title, "<div class='card empty'><div class='ic' data-icon='sales'></div>"+esc(opts.emptyMsg || "Nothing here.")+"</div>",
+        "<button class='btn primary' data-action='close-modal'>Close</button>", { wide:true });
+      return;
+    }
+    var total = entries.reduce(function(a,e){ return a + Number((opts.sumField==="owedAmount" ? e.owedAmount : e.sale.netProfit)||0); }, 0);
+    var body = (opts.note ? "<div class='hint' style='margin-bottom:10px'>"+esc(opts.note)+"</div>" : "") +
+      "<div class='pay-list'>"+entries.map(function(e){ return saleRow(e.sale, e.badge||""); }).join("")+"</div>";
+    var foot = "<div class='sale-sub' style='margin-right:auto; font-weight:700; color:var(--ink)'>"+
+      entries.length+" order"+(entries.length===1?"":"s")+" · "+money(total)+(opts.sumLabel?" "+esc(opts.sumLabel):"")+"</div>"+
+      "<button class='btn primary' data-action='close-modal'>Close</button>";
+    openModal(title, body, foot, { wide:true });
+  }
+  function settleBadge(status, settledAmount){
+    if (status==="settled") return "<span class='badge settle-done'>Paid out to you</span>";
+    if (status==="partial") return "<span class='badge settle-partial'>Partially paid — "+money(settledAmount)+" so far</span>";
+    return "<span class='badge settle-owed'>Still owed to you</span>";
+  }
+  // "Available to settle now" tile -- exactly which of Jon's paid-out sales Jax has already
+  // handed over versus what he still owes, oldest-paid-first (see jonDebtAllocation() above).
+  function openDebtBreakdown(){
+    var alloc = jonDebtAllocation();
+    var entries = alloc.rows.map(function(r){ return { sale:r.sale, badge:settleBadge(r.status, r.settledAmount), owedAmount:r.owedAmount }; });
+    var note = alloc.unallocated > 0.005
+      ? "Jax has also paid you "+money(alloc.unallocated)+" beyond what these specific sales owe -- ahead of schedule, not tied to one order."
+      : "";
+    openSalesListModal("What Jax still owes you", entries, { sumField:"owedAmount", sumLabel:"still owed", note:note, emptyMsg:"Nothing has paid out to Jon yet." });
+  }
+  // "Your payout" / "Pending payout" tiles -- every one of that owner's sales matching the tile.
+  function openOwnerSalesBreakdown(title, owner, statusFilter, emptyMsg){
+    var entries = ownerSalesList(owner, statusFilter).map(function(s){ return { sale:s }; });
+    openSalesListModal(title, entries, { emptyMsg: emptyMsg });
+  }
   function renderOverview(){
     var pending = pendingProfit(), total = totalNetProfit();
+    function ovTile(cls, f, eyebrow, value, sub){
+      return "<button type='button' class='tile "+cls+"' data-action='goto-sales-filtered' data-f='"+f+"' data-o='all'>"+
+        "<div class='eyebrow'>"+eyebrow+"</div><div class='value'>"+value+"</div><div class='sub'>"+sub+"</div></button>";
+    }
     var html = "<div class='tiles'>"+
-      "<div class='tile t-profit'><div class='eyebrow'>Total payout</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged</div></div>"+
-      "<div class='tile t-pending'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending)+"</div><div class='sub'>waiting on eBay</div></div>"+
-      "<div class='tile t-brand'><div class='eyebrow'>Paid out</div><div class='value'>"+money(total-pending)+"</div><div class='sub'>ready to collect</div></div>"+
+      ovTile("t-profit", "all", "Total payout", money(total), state.sales.length+" sale"+(state.sales.length===1?"":"s")+" logged")+
+      ovTile("t-pending", "pending", "Pending payout", money(pending), "waiting on eBay")+
+      ovTile("t-brand", "paid", "Paid out", money(total-pending), "ready to collect")+
       "</div>";
 
     html += payoutChartHtml() + chargesCardHtml() + dashCardsHtml() + insightsPreviewHtml();
@@ -2005,17 +2093,6 @@
       var p = productById(q.cost);
       if (!p){ toast("That item is no longer in the ledger"); return; }
       openItemTrip(prodKey(p)); return;
-    }
-    if (q.paidowner){
-      // "#sales?paidowner=Jon" -- the itemized proof behind a payout tile: exactly the paid-out
-      // sales for that one owner, nothing pending, nothing the other person's. Used by the
-      // "View the exact orders" links on Settlements/Overview so the dollar total is never a
-      // black box -- every figure there can be walked back to the specific orders behind it.
-      salesFilter = "paid";
-      salesOwner = (q.paidowner==="Jon" || q.paidowner==="Jax") ? q.paidowner : "all";
-      salesQ = ""; salesShown = 30;
-      render();
-      return;
     }
   }
   function openItemTrip(key){
@@ -2297,7 +2374,11 @@
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>was the payout</div></div>"+
       "<div class='sale-actions'><button class='btn small ghost danger' data-action='delete-sale' data-id='"+s.id+"'>Remove</button></div></div>";
   }
-  function saleRow(s){
+  // extraBadge is optional (a settle-status pill for the debt/payout drill-down modals below) --
+  // guarded against being a string so Array#map's (element, index) second argument can never leak
+  // in as a badge when this is used directly as a map callback (shown.slice(0, salesShown).map(saleRow)).
+  function saleRow(s, extraBadge){
+    if (typeof extraBadge !== "string") extraBadge = "";
     if (s.orderState === "cancelled") return cancelledRow(s);
     var p = productById(s.productId);
     var name = p ? p.name : "Unknown item";
@@ -2311,7 +2392,7 @@
       "<div class='sale-main'>"+
         "<div class='sale-title'>"+esc(name)+"</div>"+
         "<div class='sale-sub'>"+esc(s.buyerName||"Unknown buyer")+" · "+fmtDate(s.saleDate)+(s.orderNumber?" · #"+esc(s.orderNumber):"")+(Number(s.quantitySold)>1?" · qty "+s.quantitySold:"")+"</div>"+
-        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(s.orderState==="cancel_requested" ? "<span class='badge label-note'>Cancel requested</span>" : "")+(Number(s.adFees)>0.004 ? "<span class='badge label-note' title='Promoted-listing fee eBay charged on this sale. It is already taken out of the payout.'>Ad fee "+money(s.adFees)+"</span>" : "")+(saleProfit(s)==null ? costPill() : (saleProfit(s) < 0 ? "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Loss, check the cost</span>" : ""))+"</div>"+
+        "<div class='sale-tags'>"+ownerBadge(s)+autoTag+stockTag+payTag+labelTag+(s.orderState==="cancel_requested" ? "<span class='badge label-note'>Cancel requested</span>" : "")+(Number(s.adFees)>0.004 ? "<span class='badge label-note' title='Promoted-listing fee eBay charged on this sale. It is already taken out of the payout.'>Ad fee "+money(s.adFees)+"</span>" : "")+(saleProfit(s)==null ? costPill() : (saleProfit(s) < 0 ? "<span class='cost-badge mini'><span class='ic' data-icon='coin'></span>Loss, check the cost</span>" : ""))+extraBadge+"</div>"+
       "</div>"+
       "<div class='sale-money'><div class='sale-profit'>"+money(s.netProfit)+"</div><div class='sale-sub'>payout</div>"+
         (function(){ var pr = saleProfit(s); return pr==null ? "<div class='sale-sub cost-missing'>profit: add cost</div>" : "<div class='sale-sub cost-known'>profit "+money(pr)+"</div>"; })()+"</div>"+
@@ -2328,10 +2409,14 @@
     var canc = (state.cancelled || []).slice().sort(bySaleNewest);
     var rows = salesFilter === "cancelled" ? canc : (salesFilter === "all" ? live.concat(canc).sort(bySaleNewest) : live);   // cancelled ones show in the main list too, in red
     var total = totalNetProfit(), pending = pendingProfit();
+    function miniTile(cls, f, eyebrow, value, sub){
+      return "<button type='button' class='tile "+cls+"' data-action='goto-sales-filtered' data-f='"+f+"' data-o='all'>"+
+        "<div class='eyebrow'>"+eyebrow+"</div><div class='value'>"+value+"</div><div class='sub'>"+sub+"</div></button>";
+    }
     var html = "<div class='tiles mini'>"+
-      "<div class='tile t-profit'><div class='eyebrow'>Total payout</div><div class='value'>"+money(total)+"</div><div class='sub'>"+state.sales.length+" sale"+(state.sales.length===1?"":"s")+"</div></div>"+
-      "<div class='tile t-pending'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending)+"</div><div class='sub'>waiting on eBay</div></div>"+
-      "<div class='tile t-brand'><div class='eyebrow'>Paid out</div><div class='value'>"+money(total-pending)+"</div><div class='sub'>ready to collect</div></div>"+
+      miniTile("t-profit", "all", "Total payout", money(total), state.sales.length+" sale"+(state.sales.length===1?"":"s"))+
+      miniTile("t-pending", "pending", "Pending payout", money(pending), "waiting on eBay")+
+      miniTile("t-brand", "paid", "Paid out", money(total-pending), "ready to collect")+
       "</div>";
     html += "<div class='section-head'><h2>All sales</h2><span class='head-actions'><button class='btn' data-action='export-sales' aria-label='Export sales as a spreadsheet'><span class='ic' data-icon='download'></span> Export</button>"+
       "<button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></span></div>";
@@ -2363,16 +2448,22 @@
     var ownerPool = salesFilter==="cancelled" ? canc : live.filter(function(sa){ return matchesStatus(sa, salesFilter); });
     var ownerCounts = { all:ownerPool.length, Jon:0, Jax:0 };
     ownerPool.forEach(function(sa){ if (sa.attributedTo==="Jon" || sa.attributedTo==="Jax") ownerCounts[sa.attributedTo]++; });
-    var chipDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["nocost","Missing cost"]].concat(canc.length ? [["cancelled","Cancelled"]] : []);
-    var ownerChipDefs = [["all","Everyone"],["Jon","Jon"],["Jax","Jax"]];
+    // Two dropdowns, not a wall of pill buttons -- status and owner still combine (pick "Paid
+    // out" in one and "Jon" in the other, independently), it just doesn't take a whole shelf of
+    // chips to show it. Each option's own count updates with the OTHER dropdown's current pick,
+    // same as the chips did.
+    var statusOptDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["nocost","Missing cost"]].concat(canc.length ? [["cancelled","Cancelled"]] : []);
+    var ownerOptDefs = [["all","Everyone"],["Jon","Jon"],["Jax","Jax"]];
     html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
       "<input id='salesSearch' type='search' placeholder='Search buyer, item or order #' value='"+esc(salesQ)+"' aria-label='Search sales' autocomplete='off'></div>"+
-      "<div class='fchips'>"+chipDefs.map(function(c){
-        return "<button type='button' class='fchip"+(salesFilter===c[0]?" on":"")+"' data-action='sales-filter' data-f='"+c[0]+"'>"+c[1]+"<b>"+(counts[c[0]]||0)+"</b></button>";
-      }).join("")+"</div>"+
-      "<div class='fchips'>"+ownerChipDefs.map(function(c){
-        return "<button type='button' class='fchip"+(salesOwner===c[0]?" on":"")+"' data-action='sales-owner-filter' data-f='"+c[0]+"'>"+c[1]+"<b>"+(ownerCounts[c[0]]||0)+"</b></button>";
-      }).join("")+"</div></div>";
+      "<div class='filter-row'>"+
+      "<select id='salesStatusSelect' class='fselect' aria-label='Filter by status'>"+statusOptDefs.map(function(c){
+        return "<option value='"+c[0]+"'"+(salesFilter===c[0]?" selected":"")+">"+c[1]+" ("+(counts[c[0]]||0)+")</option>";
+      }).join("")+"</select>"+
+      "<select id='salesOwnerSelect' class='fselect' aria-label='Filter by who it is assigned to'>"+ownerOptDefs.map(function(c){
+        return "<option value='"+c[0]+"'"+(salesOwner===c[0]?" selected":"")+">"+c[1]+" ("+(ownerCounts[c[0]]||0)+")</option>";
+      }).join("")+"</select>"+
+      "</div></div>";
     var shown = rows.filter(function(sa){
       if (salesFilter==="cancelled"){
         if (!matchesOwner(sa)) return false;
@@ -2384,6 +2475,11 @@
       var pr = productById(sa.productId);
       return matchesQuery([sa.buyerName, pr && pr.name, sa.orderNumber, sa.attributedTo].join(" "), salesQ);
     });
+    // The total net for exactly what's showing right now -- so "Jon + Paid out" answers "how
+    // much" in the same glance as "which ones", without adding them up by hand. Cancelled sales
+    // never count toward it, matching every other total in the app (Total payout tile, CSV export).
+    var sumNet = shown.reduce(function(a,sa){ return a + (sa.orderState==="cancelled" ? 0 : Number(sa.netProfit||0)); }, 0);
+    html += "<div class='filter-summary'>"+shown.length+" sale"+(shown.length===1?"":"s")+" shown <b>·</b> <b>"+money(sumNet)+"</b> net</div>";
     if (!shown.length) return html + "<div class='card empty'><div class='ic' data-icon='search'></div>No sales match that. Clear the search or pick another filter.</div>";
     return html + "<div class='sales-list'>"+shown.slice(0, salesShown).map(saleRow).join("")+"</div>"+
       (shown.length > salesShown ? "<div class='more-wrap'><button class='btn' data-action='sales-more'>Show "+Math.min(30, shown.length-salesShown)+" more · "+(shown.length-salesShown)+" left</button></div>" : "");
@@ -2443,16 +2539,21 @@
       ? money(mine.available)+" available · "+money(mine.pending)+" pending across "+mine.pendingCount+" sale"+(mine.pendingCount===1?"":"s")
       : money(mine.available)+" available · nothing pending right now";
     var rp = ownerRealProfit(whoAmI);
-    var mineItemsLink = "<a class='btn small ghost' href='#sales?paidowner="+encodeURIComponent(whoAmI)+"'>View the exact orders</a>";
-    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div>"+mineItemsLink+"</div>"+
+    var html = "<div class='tiles'>"+
+      "<div class='tile t-profit' role='button' tabindex='0' data-action='open-owner-breakdown' data-owner='"+esc(whoAmI)+"' data-status='all' data-title='Your sales' data-empty='No sales logged yet.'>"+
+        "<div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div>"+
+        "<div class='tap-hint'>Tap for the order-by-order list →</div></div>"+
       "<div class='tile t-brand'><div class='eyebrow'>Your profit (internal)</div><div class='value'>"+money(rp.profit)+"</div><div class='sub'>"+
         (rp.missing ? "so far, "+rp.missing+" sale"+(rp.missing===1?"":"s")+" still need a cost. " : "Payout minus what you paid. ")+"Just for your own tracking. It never changes what you and Jax owe each other.</div></div></div>";
 
     html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
     html += "<div class='tiles'>"+
-      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it.</div>"+
-        "<a class='btn small ghost' href='#sales?paidowner=Jon'>View the exact orders</a></div>"+
-      "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
+      "<div class='tile tone-"+bl.tone+"' role='button' tabindex='0' data-action='open-debt-breakdown'>"+
+        "<div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it.</div>"+
+        "<div class='tap-hint'>Tap to see exactly which orders →</div></div>"+
+      "<div class='tile' role='button' tabindex='0' data-action='open-owner-breakdown' data-owner='Jon' data-status='pending' data-title='Pending payout' data-empty='Nothing attributed to Jon is pending right now.'>"+
+        "<div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div>"+
+        "<div class='tap-hint'>Tap for the order-by-order list →</div></div>"+
       "</div>";
 
     html += "<div class='section-head'><h2>Payment history</h2><button class='btn primary' data-action='open-add-settlement'><span class='ic' data-icon='plus'></span> Record payment</button></div>";
@@ -2652,8 +2753,12 @@
     if (action==="bought-split"){
       if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
-    if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
-    if (action==="sales-owner-filter"){ salesOwner = t.dataset.f; salesShown = 30; render(); return; }
+    if (action==="goto-sales-filtered"){
+      salesFilter = t.dataset.f || "all"; salesOwner = t.dataset.o || "all"; salesQ = ""; salesShown = 30;
+      setTab("sales"); return;
+    }
+    if (action==="open-debt-breakdown") return openDebtBreakdown();
+    if (action==="open-owner-breakdown") return openOwnerSalesBreakdown(t.dataset.title, t.dataset.owner, t.dataset.status, t.dataset.empty);
     if (action==="cost-all"){
       var allItems = {}, missKeys = missingCostGroups().map(function(x){ return x.g.key; });
       productGroupList().forEach(function(g){ allItems[g.key] = { checked: missKeys.indexOf(g.key)!==-1 }; });
@@ -2857,6 +2962,11 @@
   document.querySelectorAll(".navbtn").forEach(function(b){ b.addEventListener("click", function(){ if (b.dataset.tab==="inventory") invFilter = "all"; setTab(b.dataset.tab); }); });
 
   document.addEventListener("keydown", function(e){
+    // clickable tiles (role="button", not a real <button>, so they keep their gradient/decorative
+    // markup unchanged) need Enter/Space to act like a click, the same as any native button would.
+    if ((e.key === "Enter" || e.key === " ") && e.target && e.target.matches && e.target.matches("[data-action][role='button']")){
+      e.preventDefault(); e.target.click(); return;
+    }
     var m = $("#modalRoot .modal");
     if (e.key === "Escape" && m) closeModal();
     if (e.key === "Enter" && m && e.target && e.target.tagName === "INPUT" && ["checkbox","radio","button","file"].indexOf(e.target.type) === -1){
@@ -2877,6 +2987,8 @@
       if (e.target.classList.contains("trip-chk") && !e.target.checked) clearTripFlag(e.target.closest(".trip-row"));
       updateTripSummary();
     }
+    if (e.target && e.target.id === "salesStatusSelect"){ salesFilter = e.target.value; salesShown = 30; render(); }
+    if (e.target && e.target.id === "salesOwnerSelect"){ salesOwner = e.target.value; salesShown = 30; render(); }
   });
   var searchTimer = null;
   document.addEventListener("input", function(e){
