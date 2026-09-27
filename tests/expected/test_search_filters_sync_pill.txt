@@ -1,5 +1,5 @@
 hash start tab: sales | tesseract loaded at start: False
-chips: ['All20', 'Pending payout20', 'Paid out0', 'Unassigned3', 'Missing cost14', 'Jon11', 'Jax6']
+chips: ['All20', 'Pending payout20', 'Paid out0', 'Unassigned3', 'Missing cost14', 'Everyone20', 'Jon11', 'Jax6']
 unassigned rows: 3
 search 'pikachu' rows: 1 | focus kept: salesSearch | value: pikachu
 no-match msg: No sales match that. Clear the search or pick another filter

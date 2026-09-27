@@ -364,6 +364,8 @@
   .tile .eyebrow{ color:rgba(255,255,255,.88); text-transform:uppercase; letter-spacing:.09em; font-size:11px; font-weight:700; }
   .tile .value{ font-family:var(--display); font-size:42px; font-weight:800; letter-spacing:-.035em; margin-top:6px; color:#fff; font-variant-numeric:tabular-nums; }
   .tile .sub{ color:rgba(255,255,255,.9); font-size:13px; }
+  .tile .btn.ghost{ margin-top:12px; color:#fff; background:rgba(255,255,255,.18); }
+  .tile .btn.ghost:hover{ background:rgba(255,255,255,.28); }
   .tiles .tile:nth-child(2){ background:var(--g-jon); --glow:rgba(37,99,255,.7); }
   .tiles .tile:nth-child(3){ background:var(--g-jax); --glow:rgba(224,32,138,.65); }
   .tiles .tile:nth-child(4){ background:var(--g-pending); --glow:rgba(255,120,40,.65); }
@@ -875,7 +877,7 @@
   function tabFromHash(){ var h = parseHash().tab; return TABS.indexOf(h)>=0 ? h : null; }
   var pendingDeepLink = (function(){ var h = parseHash(); return Object.keys(h.q).length ? h : null; })();
   if (tabFromHash()) tab = tabFromHash();
-  var salesQ = "", salesFilter = "all", salesShown = 30, invQ = "", invFilter = "all";
+  var salesQ = "", salesFilter = "all", salesOwner = "all", salesShown = 30, invQ = "", invFilter = "all";
   var loaded = { products:false, batches:false, sales:false, settlements:false };
   var syncMeta = null;
   var whoAmI = "Jon";
@@ -2004,6 +2006,17 @@
       if (!p){ toast("That item is no longer in the ledger"); return; }
       openItemTrip(prodKey(p)); return;
     }
+    if (q.paidowner){
+      // "#sales?paidowner=Jon" -- the itemized proof behind a payout tile: exactly the paid-out
+      // sales for that one owner, nothing pending, nothing the other person's. Used by the
+      // "View the exact orders" links on Settlements/Overview so the dollar total is never a
+      // black box -- every figure there can be walked back to the specific orders behind it.
+      salesFilter = "paid";
+      salesOwner = (q.paidowner==="Jon" || q.paidowner==="Jax") ? q.paidowner : "all";
+      salesQ = ""; salesShown = 30;
+      render();
+      return;
+    }
   }
   function openItemTrip(key){
     var r = unpricedForKey(key), g = r.g;
@@ -2323,26 +2336,50 @@
     html += "<div class='section-head'><h2>All sales</h2><span class='head-actions'><button class='btn' data-action='export-sales' aria-label='Export sales as a spreadsheet'><span class='ic' data-icon='download'></span> Export</button>"+
       "<button class='btn primary' data-action='open-add-sale'><span class='ic' data-icon='plus'></span> Record sale</button></span></div>";
     if (!live.length && !canc.length){ return html + "<div class='card empty'><div class='ic' data-icon='sales'></div>No sales yet — they appear here as soon as eBay reports one.</div>"; }
-    var counts = { all:live.length + canc.length, pending:0, paid:0, unassigned:0, nocost:0, cancelled:canc.length, Jon:0, Jax:0 };
-    live.forEach(function(sa){
+    // Status (paid/pending/...) and owner (Jon/Jax) are independent axes, not one flat list of
+    // chips -- picking "Paid out" no longer clears "Jon", so "the exact items that were paid out,
+    // just mine" is one look, not a mental AND of two separate searches. Each row's counts are
+    // narrowed by the OTHER row's current pick, so e.g. the "Jon"/"Jax" counts already reflect
+    // "Paid out" once that's selected, instead of always showing the grand total.
+    function matchesStatus(sa, f){
+      if (f==="pending") return sa.lifecycleStatus==="pending";
+      if (f==="paid") return sa.lifecycleStatus==="completed";
+      if (f==="unassigned") return !sa.attributedTo;
+      if (f==="nocost") return saleProfit(sa)==null;
+      return true; // "all"
+    }
+    function matchesOwner(sa){ return salesOwner==="all" || sa.attributedTo===salesOwner; }
+    var statusPool = live.filter(matchesOwner);
+    var cancPool = canc.filter(matchesOwner);
+    // "All" mirrors what actually shows under that chip -- live AND cancelled together, same as
+    // the `rows` this filters below -- not just the live count.
+    var counts = { all:statusPool.length + cancPool.length, pending:0, paid:0, unassigned:0, nocost:0, cancelled:cancPool.length };
+    statusPool.forEach(function(sa){
       if (saleProfit(sa)==null) counts.nocost++;
       if (sa.lifecycleStatus==="pending") counts.pending++;
       if (sa.lifecycleStatus==="completed") counts.paid++;
-      if (!sa.attributedTo) counts.unassigned++; else counts[sa.attributedTo]++;
+      if (!sa.attributedTo) counts.unassigned++;
     });
-    var chipDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["nocost","Missing cost"],["Jon","Jon"],["Jax","Jax"]].concat(canc.length ? [["cancelled","Cancelled"]] : []);
+    var ownerPool = salesFilter==="cancelled" ? canc : live.filter(function(sa){ return matchesStatus(sa, salesFilter); });
+    var ownerCounts = { all:ownerPool.length, Jon:0, Jax:0 };
+    ownerPool.forEach(function(sa){ if (sa.attributedTo==="Jon" || sa.attributedTo==="Jax") ownerCounts[sa.attributedTo]++; });
+    var chipDefs = [["all","All"],["pending","Pending payout"],["paid","Paid out"],["unassigned","Unassigned"],["nocost","Missing cost"]].concat(canc.length ? [["cancelled","Cancelled"]] : []);
+    var ownerChipDefs = [["all","Everyone"],["Jon","Jon"],["Jax","Jax"]];
     html += "<div class='filter-bar'><div class='search'><span class='ic' data-icon='search'></span>"+
       "<input id='salesSearch' type='search' placeholder='Search buyer, item or order #' value='"+esc(salesQ)+"' aria-label='Search sales' autocomplete='off'></div>"+
       "<div class='fchips'>"+chipDefs.map(function(c){
         return "<button type='button' class='fchip"+(salesFilter===c[0]?" on":"")+"' data-action='sales-filter' data-f='"+c[0]+"'>"+c[1]+"<b>"+(counts[c[0]]||0)+"</b></button>";
+      }).join("")+"</div>"+
+      "<div class='fchips'>"+ownerChipDefs.map(function(c){
+        return "<button type='button' class='fchip"+(salesOwner===c[0]?" on":"")+"' data-action='sales-owner-filter' data-f='"+c[0]+"'>"+c[1]+"<b>"+(ownerCounts[c[0]]||0)+"</b></button>";
       }).join("")+"</div></div>";
     var shown = rows.filter(function(sa){
-      if (salesFilter==="cancelled") return !salesQ.trim() || matchesQuery([sa.buyerName, (productById(sa.productId)||{}).name, sa.orderNumber].join(" "), salesQ);
-      if (salesFilter==="pending" && sa.lifecycleStatus!=="pending") return false;
-      if (salesFilter==="paid" && sa.lifecycleStatus!=="completed") return false;
-      if (salesFilter==="unassigned" && sa.attributedTo) return false;
-      if (salesFilter==="nocost" && saleProfit(sa)!=null) return false;
-      if ((salesFilter==="Jon" || salesFilter==="Jax") && sa.attributedTo!==salesFilter) return false;
+      if (salesFilter==="cancelled"){
+        if (!matchesOwner(sa)) return false;
+        return !salesQ.trim() || matchesQuery([sa.buyerName, (productById(sa.productId)||{}).name, sa.orderNumber].join(" "), salesQ);
+      }
+      if (!matchesStatus(sa, salesFilter)) return false;
+      if (!matchesOwner(sa)) return false;
       if (!salesQ.trim()) return true;
       var pr = productById(sa.productId);
       return matchesQuery([sa.buyerName, pr && pr.name, sa.orderNumber, sa.attributedTo].join(" "), salesQ);
@@ -2406,13 +2443,15 @@
       ? money(mine.available)+" available · "+money(mine.pending)+" pending across "+mine.pendingCount+" sale"+(mine.pendingCount===1?"":"s")
       : money(mine.available)+" available · nothing pending right now";
     var rp = ownerRealProfit(whoAmI);
-    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div></div>"+
+    var mineItemsLink = "<a class='btn small ghost' href='#sales?paidowner="+encodeURIComponent(whoAmI)+"'>View the exact orders</a>";
+    var html = "<div class='tiles'><div class='tile t-profit'><div class='eyebrow'>Your payout</div><div class='value'>"+money(mine.total)+"</div><div class='sub'>"+esc(mineSub)+"</div>"+mineItemsLink+"</div>"+
       "<div class='tile t-brand'><div class='eyebrow'>Your profit (internal)</div><div class='value'>"+money(rp.profit)+"</div><div class='sub'>"+
         (rp.missing ? "so far, "+rp.missing+" sale"+(rp.missing===1?"":"s")+" still need a cost. " : "Payout minus what you paid. ")+"Just for your own tracking. It never changes what you and Jax owe each other.</div></div></div>";
 
     html += "<div class='section-head'><h2>Between you and Jax</h2></div>";
     html += "<div class='tiles'>"+
-      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it.</div></div>"+
+      "<div class='tile tone-"+bl.tone+"'><div class='eyebrow'>Available to settle now</div><div class='value'>"+esc(bl.text)+"</div><div class='sub'>From sales eBay has already paid out — the money's actually landed. Uses the full payout; what you paid for the items doesn't reduce it.</div>"+
+        "<a class='btn small ghost' href='#sales?paidowner=Jon'>View the exact orders</a></div>"+
       "<div class='tile'><div class='eyebrow'>Pending payout</div><div class='value'>"+money(pending.amount)+"</div><div class='sub'>"+esc(pendingSub)+" — not collectible until then.</div></div>"+
       "</div>";
 
@@ -2614,6 +2653,7 @@
       if ($("#p_cost") && pendingBought) pendingBought.cost = $("#p_cost").value; openBoughtModal(t.dataset.key); return; }
     if (action==="submit-bought"){ openPurchaseConfirm(t.dataset.key, { Jon:$("#f_bj").value, Jax:$("#f_bx").value }); return; }
     if (action==="sales-filter"){ salesFilter = t.dataset.f; salesShown = 30; render(); return; }
+    if (action==="sales-owner-filter"){ salesOwner = t.dataset.f; salesShown = 30; render(); return; }
     if (action==="cost-all"){
       var allItems = {}, missKeys = missingCostGroups().map(function(x){ return x.g.key; });
       productGroupList().forEach(function(g){ allItems[g.key] = { checked: missKeys.indexOf(g.key)!==-1 }; });

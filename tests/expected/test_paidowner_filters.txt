@@ -1,0 +1,10 @@
+start: rows 20 of 20
+paid+Jon: rows 4 want 4 | status chip on: True | owner chip on: True
+paid+Jax: rows 2 want 2
+pending+Jax: rows 4 want 4
+pending+everyone: rows 14 want 14
+owner chip count under 'pending': 7 want 7
+owner chip count under 'paid': 4 want 4
+deep link paidowner=Jax: rows 2 want 2 | status chip on: True | owner chip on: True | tab: sales
+settlements links: ['#sales?paidowner=Jon', '#sales?paidowner=Jon']
+errors: [] | scrollW 390
