@@ -15,9 +15,18 @@ Escape closes it: 0
 Your payout modal rows: 11 | want 11
 default from/to/amount: Jax Jon 155.12 | want amount 155.12
 checklist starts with both outstanding cards checked: 2 | no Edit/Remove on them: 0
-unchecking the 2nd card drops it and updates Amount live: 1 118.11
-re-checking restores the full amount: 2 155.12
-search found the settled order and checking it raised Amount: 1 350.78
-flip to Jon -> Jax, checklist hides: True | search field hides too: True
-flip back, selection was preserved (not reset): 2
+unchecking the 2nd card drops it and updates Amount live: 1 37.01
+results visible the instant it's clicked into, before typing anything: True
+results shown with nothing typed vs filtered by buyer name: 2 -> 1
+picked an already-settled order from the results, Amount rose and it's now checked, results closed: 232.67 True False
+flip to Jon -> Jax, checklist hides: True | add field hides too: True
+flip back, selection was preserved (not reset): True
+the order left unchecked at save time: GTA 6 Sony PS5 DualSense Controller GTA VI Limited Edition Black | PREORDER | its badge now: Still owed to you
+(want: 'Still owed to you' -- unchecking it must guarantee that, no matter what else was saved)
+reconciliation after a real save (allocations + legacy settlement both present): {'owedMinusUnalloc': 155.12, 'bal': 155.12, 'matches': True}
+2nd payment opens pre-filled with exactly what's left: 155.12 | want 155.12
+all rows were checked by default: True | everything settled after paying it off: {'owedMinusUnalloc': 0, 'bal': -0.0, 'matches': True} | still-owed total is now $0: 0
+deleted a fully-settled sale, reconciliation still holds: {'owedMinusUnalloc': -195.66, 'bal': -195.66, 'matches': True}
+edited a settled sale's payout down, reconciliation still holds: {'owedMinusUnalloc': -352.87, 'bal': -352.87, 'matches': True}
+ledger banner stays silent (everything still reconciles): True
 errors: [] | scrollW 390
