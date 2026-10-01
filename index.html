@@ -1478,7 +1478,7 @@
   // each, including units not sold yet). The split rule below mirrors ebay_sync.py: highest
   // profit per unit goes to Jon until his units are covered, the rest to Jax; sales still in
   // flight re-rank as more orders arrive, and a paid-out or hand-set sale never moves.
-  var lastPurchaseUndo = null, pendingBought = null, pendingTrip = null, lastTripUndo = null;
+  var lastPurchaseUndo = null, pendingBought = null, pendingTrip = null, lastTripUndo = null, pendingQuickCost = null;
   var PURCHASE_NOTE = "Purchase split you entered — add the unit cost when you have it.";
   function nameKey(name){ return String(name || "").toLowerCase().replace(/[^\p{L}\p{N}]/gu, ""); }   // same rule as the server: letters and digits of any language
   // Which items are "the same product"? Identical titles always are. A relisted item with an edited title is only
@@ -1768,7 +1768,7 @@
       "<div class='field' style='margin-top:14px'><label for='p_cost'>Unit cost each ($) <span class='opt'>optional</span></label>"+
       "<input id='p_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(pendingBought.cost)+"'>"+
       "<div class='hint'>What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set.</div>"+
-      "<button type='button' class='linkbtn' style='margin-top:8px' data-action='confirm-then-trip' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Bought other items on the same receipt? Log the full total instead &rarr;</button></div>",
+      "<button type='button' class='linkbtn' style='margin-top:8px' data-action='confirm-then-trip' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Bought this along with other stuff on one receipt? Use the full calculator &rarr;</button></div>",
       "<button class='btn' data-action='bought-split' data-key='"+esc(key)+"'>Back</button>"+
       "<button class='btn primary' data-action='confirm-purchase' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Confirm</button>");
   }
@@ -2334,7 +2334,13 @@
         (/^Enter the total/.test(c.problem) && c.subtotal>0 ? " <button type='button' class='linkbtn' data-action='trip-total-items'>Use "+money(c.subtotal + (c.other||0))+" (no tax)</button>" : "");
       return;
     }
-    box.innerHTML = "Items "+money(c.subtotal)+(c.other>0 ? " · not listed "+money(c.other) : "")+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>";
+    // A tax/fee rate this far from normal almost always means Total paid at checkout belongs to a
+    // DIFFERENT receipt than the Qty typed above it (the exact mix-up that caused a real mismatch
+    // live) -- a plain math result would otherwise hide that as a huge, silent fake discount.
+    var mismatch = c.base > 0.01 && Math.abs(c.rate) > 0.4
+      ? "<div class='hint warn' style='margin-top:6px'>That's a "+Math.abs(c.rate*100).toFixed(0)+"% gap between the items' price and what you paid — make sure Total paid at checkout is just THIS receipt. If this covers more than one receipt, log each one separately instead.</div>"
+      : "";
+    box.innerHTML = "Items "+money(c.subtotal)+(c.other>0 ? " · not listed "+money(c.other) : "")+" · "+(c.extras<0?"discount ":"tax & fees ")+money(Math.abs(c.extras))+" ("+(c.rate*100).toFixed(1)+"%) · you paid <b>"+money(c.total)+"</b>"+mismatch;
   }
   // ---- one item, its unpriced units: a small window prefilled with the price already logged ----
   function unpricedForKey(key){
@@ -2352,8 +2358,6 @@
     var top = pool[0], unit = Number(top.unitCost)||0;
     return { unit:unit, price: (top.costMeta && top.costMeta.price!=null) ? Number(top.costMeta.price) : unit };
   }
-  // "Add cost" on one item: the same full form as a store trip (price before tax, quantity, order
-  // total, other items, tax spread, who), just for this item, prefilled from what was logged before
   function openOwnerPick(saleId){
     var sa = state.sales.find(function(x){ return x.id===saleId; });
     if (!sa){ toast("That sale is no longer in the ledger"); return; }
@@ -2372,10 +2376,69 @@
     if (q.cost){
       var p = productById(q.cost);
       if (!p){ toast("That item is no longer in the ledger"); return; }
-      openItemTrip(prodKey(p)); return;
+      openQuickCost(prodKey(p)); return;
     }
   }
-  function openItemTrip(key){
+  // The everyday "Add cost" screen: one field, no tax math. Almost every real purchase is a flat
+  // per-unit price, so that's the default -- the full receipt-total calculator (openItemTrip, right
+  // below) is one tap away for the rare case of a multi-item receipt, never the first thing shown.
+  function openQuickCost(key){
+    var r = unpricedForKey(key), g = r.g;
+    if (!g) return;
+    if (!r.un.length){ toast("Every unit of this item already has a price"); return; }
+    var owners = ["Jon","Jax"].filter(function(o){ return r.un.some(function(b){ return b.owner===o; }); });
+    var who = owners.indexOf(whoAmI)!==-1 ? whoAmI : owners[0];
+    var prior = lastCostInfo(g.pids, who);
+    pendingQuickCost = { key:key, scope: owners.length>1 ? "both" : owners[0], cost: prior ? String(round2(prior.price)) : "" };
+    openQuickCostModal();
+  }
+  function openQuickCostModal(){
+    var t = pendingQuickCost; if (!t) return;
+    var r = unpricedForKey(t.key), g = r.g;
+    if (!g){ closeModal(); return; }
+    var owners = ["Jon","Jax"].filter(function(o){ return r.un.some(function(b){ return b.owner===o; }); });
+    var units = {};
+    owners.forEach(function(o){ units[o] = r.un.filter(function(b){ return b.owner===o; }).reduce(function(a,b){ return a + Number(b.quantity||0); }, 0); });
+    var totalUnits = r.un.reduce(function(a,b){ return a + Number(b.quantity||0); }, 0);
+    var scopeHtml = owners.length > 1
+      ? "<div class='field'><label>Who paid this price?</label><div class='seg-choice'>"+
+          "<label><input type='radio' name='qc_scope' value='both'"+(t.scope!=="Jon" && t.scope!=="Jax" ? " checked" : "")+"> Both Jon and Jax <small>(same price, "+totalUnits+" unit"+(totalUnits===1?"":"s")+")</small></label>"+
+          "<label><input type='radio' name='qc_scope' value='Jon'"+(t.scope==="Jon" ? " checked" : "")+"> Just Jon <small>("+units.Jon+")</small></label>"+
+          "<label><input type='radio' name='qc_scope' value='Jax'"+(t.scope==="Jax" ? " checked" : "")+"> Just Jax <small>("+units.Jax+")</small></label>"+
+        "</div></div>"
+      : "";
+    openModal("Add cost — "+g.p.name,
+      "<div class='sale-sub' style='margin-bottom:8px'>"+totalUnits+" unit"+(totalUnits===1?"":"s")+" still need"+(totalUnits===1?"s":"")+" a price</div>"+
+      "<div class='field'><label for='qc_cost'>What did each one cost? ($)</label>"+
+      "<input id='qc_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(t.cost)+"'>"+
+      "<div class='hint'>Per unit, tax included. Type 0 if it was free.</div></div>"+
+      scopeHtml+
+      "<button type='button' class='linkbtn' data-action='open-item-trip-advanced' data-key='"+esc(t.key)+"'>Bought this along with other stuff on one receipt? Use the full calculator &rarr;</button>",
+      "<button class='btn' data-action='close-modal'>Cancel</button><button class='btn primary' data-action='submit-quick-cost'>Save</button>");
+  }
+  function applyQuickCost(){
+    var t = pendingQuickCost; if (!t) return;
+    var raw = ($("#qc_cost")||{}).value;
+    if (String(raw).trim()===""){ toast("Enter what it cost, or type 0 if it was free"); return; }
+    var val = round2(Number(raw)||0);
+    var scopeEl = document.querySelector("input[name='qc_scope']:checked");
+    var scope = scopeEl ? scopeEl.value : "both";
+    var r = unpricedForKey(t.key); if (!r.g) return;
+    var targets = r.un.filter(function(b){ return scope==="both" || b.owner===scope; });
+    if (!targets.length){ toast("Nothing to price"); return; }
+    var meta = { price:val, qty:1, mode:"flat", at:Date.now() };
+    var undo = { changed:[], created:[] };
+    targets.forEach(function(b){
+      undo.changed.push({ id:b.id, unitCost:b.unitCost||0, costKnown:!!b.costKnown, costMeta:b.costMeta||null, note:b.note||"", needsReview:!!b.needsReview });
+      updateBatch(b.id, { unitCost:val, costKnown:true, costMeta:meta, needsReview:false, note:(b.note===AUTO_BATCH_NOTE || b.note===PURCHASE_NOTE) ? "" : (b.note||"") });
+    });
+    lastTripUndo = undo; pendingQuickCost = null;
+    toastAction(targets.length+" unit"+(targets.length===1?"":"s")+" priced at "+money(val)+" each.", "Undo", "undo-trip");
+    return true;
+  }
+  // The full receipt-total calculator, for a checkout that also had other items and tax to split
+  // out -- reached from openQuickCost's "Use the full calculator" link, never the first screen shown.
+  function openItemTrip(key, prefillPrice){
     var r = unpricedForKey(key), g = r.g;
     if (!g) return;
     if (!r.un.length){ toast("Every unit of this item already has a price"); return; }
@@ -2383,8 +2446,10 @@
     var who = owners.indexOf(whoAmI)!==-1 ? whoAmI : owners[0];
     var qty = r.un.filter(function(b){ return b.owner===who; }).reduce(function(a,b){ return a + Number(b.quantity||0); }, 0) || 1;
     var prior = lastCostInfo(g.pids, who);
-    var items = {}; items[key] = { checked:true, qty:String(qty), price: prior ? String(round2(prior.price)) : "" };
-    pendingTrip = { only:key, who:who, total: prior ? String(round2(qty*prior.unit)) : "", other:"", otherQty:"1", mode:"prop", both:true, replace:false, items:items };
+    var hasPrefill = prefillPrice!=null && String(prefillPrice).trim()!=="";
+    var priceVal = hasPrefill ? String(round2(Number(prefillPrice))) : (prior ? String(round2(prior.price)) : "");
+    var items = {}; items[key] = { checked:true, qty:String(qty), price: priceVal };
+    pendingTrip = { only:key, who:who, total: hasPrefill ? String(round2(qty*Number(prefillPrice))) : (prior ? String(round2(qty*prior.unit)) : ""), other:"", otherQty:"1", mode:"prop", both:true, replace:false, items:items };
     openTripModal();
   }
   function openTripModal(){
@@ -2396,7 +2461,7 @@
       var qty = it.qty!=null && it.qty!=="" ? it.qty : (ownerQty || groupStock(g.pids).sold || 1);
       return "<div class='trip-row' data-key='"+esc(g.key)+"'>"+
         "<label class='trip-pick'><input type='checkbox' class='trip-chk'"+(it.checked===false ? "" : " checked")+"> "+prodThumb(g.p, g.p.name)+"<span class='trip-name'>"+esc(g.p.name)+"</span></label>"+
-        "<div class='trip-nums'><label>Qty<input type='number' class='trip-qty' min='1' step='1' value='"+esc(qty)+"'></label>"+
+        "<div class='trip-nums'><label>Qty on this receipt<input type='number' class='trip-qty' min='1' step='1' value='"+esc(qty)+"'></label>"+
         "<label>Price each<input type='number' class='trip-price' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(it.price!=null?it.price:"")+"'></label></div></div>";
     }).join("");
     var listHtml = "<div class='trip-list' data-only='"+esc(t.only||"")+"'>"+rows+"</div>";
@@ -3165,7 +3230,9 @@
       pendingTrip = { who: whoAmI, total:"", other:"", otherQty:"1", mode:"prop", items: allItems };
       openTripModal(); return;
     }
-    if (action==="cost-one"){ openItemTrip(t.dataset.key); return; }
+    if (action==="cost-one"){ openQuickCost(t.dataset.key); return; }
+    if (action==="submit-quick-cost"){ if (applyQuickCost()) closeModal(); return; }
+    if (action==="open-item-trip-advanced"){ openItemTrip(t.dataset.key, ($("#qc_cost")||{}).value); return; }
     if (action==="export-sales"){ exportSalesCSV(); return; }
     if (action==="inv-filter"){ invFilter = t.dataset.f; render(); return; }
     if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }

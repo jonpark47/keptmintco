@@ -1,5 +1,5 @@
 overview | cost pills: 4 | strips: 0
 inventory | cost pills: 5 | strips: 8
 sales | cost pills: 16 | strips: 0
-modal: Price for this item
+modal: Add cost — Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario
 errors: [] scrollW 390
