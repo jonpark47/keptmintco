@@ -1247,14 +1247,55 @@
     var diff = round2(owed - d.unallocated - bal);
     return { ok: Math.abs(diff) < 0.02, diff: diff };
   }
+  // A live check for the exact failure class behind the Delta Reign mix-up (2026-10-01): a batch of
+  // sales got auto-split by a since-fixed version of allocateSales() and ended up all attributed to
+  // Jon, with Jax's declared share sitting unused -- not caught for days because each sale alone just
+  // looked like "cost not logged yet" the moment Jon's purchased quantity ran out. The one shape that
+  // can ONLY mean "units are attributed to the wrong person" (never "hasn't logged the purchase
+  // yet"): for one product, Jon and Jax's purchased quantities add up to exactly what's been sold
+  // overall (nothing is actually still unbought), yet one of them has more sold against their name
+  // than they bought and the other has the mirror amount spare. A genuine not-yet-purchased gap
+  // never balances like that -- it just leaves a shortfall with no matching surplus anywhere.
+  function attributionCheck(){
+    var groups = {};
+    function g(pid){
+      var k = groupKeyForSale({ productId:pid });
+      return groups[k] || (groups[k] = { pid:pid, purchased:{Jon:0,Jax:0}, sold:{Jon:0,Jax:0} });
+    }
+    state.batches.forEach(function(b){ g(b.productId).purchased[b.owner] += Number(b.quantity||0); });
+    state.sales.forEach(function(s){
+      var row = g(s.productId);
+      row.sold.Jon += ownerShareOfSale(s,"Jon").qty;
+      row.sold.Jax += ownerShareOfSale(s,"Jax").qty;
+    });
+    var problems = [];
+    Object.keys(groups).forEach(function(k){
+      var r = groups[k];
+      if (Math.abs(round2(r.purchased.Jon + r.purchased.Jax) - round2(r.sold.Jon + r.sold.Jax)) > 0.001) return;
+      var jonOff = round2(r.sold.Jon - r.purchased.Jon);
+      if (Math.abs(jonOff) < 0.001) return;
+      var p = productById(r.pid);
+      problems.push({ name: p ? p.name : "An item", off: Math.abs(jonOff), over: jonOff>0 ? "Jon" : "Jax", under: jonOff>0 ? "Jax" : "Jon" });
+    });
+    return problems;
+  }
   function renderLedgerBanner(){
     var b = $("#ledgerBanner");
     if (!b) return;
     if (isLoading()){ b.innerHTML = ""; return; }
     var c = ledgerCheck();
-    if (c.ok){ b.innerHTML = ""; return; }
-    b.innerHTML = "<div class='banner error'><span class='ic' data-icon='coin'></span>"+
-      "<span>The settlement math is off by "+money(Math.abs(c.diff))+" -- don't rely on the payout or debt numbers below until this is fixed. Tell Claude.</span></div>";
+    if (!c.ok){
+      b.innerHTML = "<div class='banner error'><span class='ic' data-icon='coin'></span>"+
+        "<span>The settlement math is off by "+money(Math.abs(c.diff))+" -- don't rely on the payout or debt numbers below until this is fixed. Tell Claude.</span></div>";
+      return;
+    }
+    var mis = attributionCheck();
+    if (mis.length){
+      b.innerHTML = "<div class='banner error'><span class='ic' data-icon='coin'></span>"+
+        "<span>"+mis.map(function(m){ return esc(m.over)+" is down for "+m.off+" more unit"+(m.off===1?"":"s")+" of “"+esc(m.name)+"” than "+esc(m.over)+" bought -- some of those sales probably belong to "+esc(m.under)+" instead. Tell Claude."; }).join(" ")+"</span></div>";
+      return;
+    }
+    b.innerHTML = "";
   }
   // Turns the "Record payment" checklist into a specific record: oldest-checked-sale-first,
   // capped at what that sale actually still owed when it was checked, until the typed amount runs

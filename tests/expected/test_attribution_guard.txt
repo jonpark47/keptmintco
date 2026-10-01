@@ -1,0 +1,5 @@
+misattribution caught -- Jon over, by how many: [('Jon', 2)]
+banner text present on screen: Jon is down for 2 more units of “Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario” than Jon bought -- some of those sales probably belong to Jax instead. Tell Claude.
+clears once attribution matches purchases: []
+stays quiet for an ordinary not-yet-purchased gap (no matching surplus anywhere): []
+errors: []
