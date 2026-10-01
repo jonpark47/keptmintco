@@ -1,0 +1,15 @@
+1+1, one buyer takes both -- real split, not all-or-nothing: {'both': {'Jon': 1, 'Jax': 1}}
+3-unit order, Jon has 2 left Jax has 1 left -- splits 2/1: {'three': {'Jon': 2, 'Jax': 1}}
+computeBalance() counts only Jon's $50 half, not the full $100: 50
+jonDebtAllocation() has exactly one row, Jon's $50 share: [(50, 'owed')]
+saleProfit() with no cost logged yet is null (nothing priced): None
+priced: combined profit $100 payout - ($10+$30) cost = $60: 60
+priced: Jon's own share is $50 payout - $10 cost = $40: {'profit': 40, 'missing': 0}
+priced: Jax's own share is $50 payout - $30 cost = $20: {'profit': 20, 'missing': 0}
+ledger reconciles with a split sale present: True
+preview shows the split pill on the 2-unit sale: 1
+preview split pill text: Split — Jon ×1 / Jax ×1
+saved sale -- real splitQty, not collapsed to one owner: [['s2', None, {'Jon': 1, 'Jax': 1}]]
+a batch created for EACH owner (not just one): [['Jax', 1], ['Jon', 1]]
+the main Sales list itself shows the split pill, not 'Unassigned': 1
+errors: [] | scrollW 390

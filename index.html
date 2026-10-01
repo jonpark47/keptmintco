@@ -201,6 +201,7 @@
   .badge{ display:inline-flex; align-items:center; gap:4px; font-size:12px; font-weight:600; padding:3px 10px; border-radius:99px; white-space:nowrap; }
   .badge.owner-Jon{ background:var(--jon-soft); color:var(--jon); }
   .badge.owner-Jax{ background:var(--jax-soft); color:var(--jax); }
+  .badge.owner-split{ background:linear-gradient(90deg, var(--jon-soft) 50%, var(--jax-soft) 50%); color:var(--ink); font-weight:700; }
   .badge.status-preorder{ background:var(--warn-soft); color:var(--warn); }
   .badge.status-transit{ background:var(--accent-soft); color:var(--accent); }
   .badge.status-received{ background:var(--good-soft); color:var(--good); }
@@ -400,6 +401,7 @@
   .badge{ font-weight:700; padding:4px 11px; letter-spacing:.005em; }
   .badge.owner-Jon{ background:var(--g-jon); color:#fff; box-shadow:0 6px 14px -6px rgba(37,99,255,.8); }
   .badge.owner-Jax{ background:var(--g-jax); color:#fff; box-shadow:0 6px 14px -6px rgba(224,32,138,.75); }
+  .badge.owner-split{ background:linear-gradient(90deg, var(--g-jon) 50%, var(--g-jax) 50%); color:#fff; box-shadow:0 6px 14px -6px rgba(120,60,180,.75); }
   .badge.owner-none{ background:var(--warn-soft); color:var(--warn); border:1px dashed var(--warn); }
   .badge.status-received, .badge.lifecycle-completed{ background:var(--good-soft); color:var(--good); }
   .badge.status-preorder, .badge.lifecycle-pending, .badge.review{ background:var(--warn-soft); color:var(--warn); }
@@ -1106,9 +1108,31 @@
   // sales. lifecycleStatus only ever actually holds "pending" or "completed" today, so this
   // changes nothing in practice; it just closes off a theoretical third value quietly drifting
   // the two apart later.
+  // One real order can legitimately draw from BOTH people's stock at once -- Jon has 1 unit left,
+  // Jax has 1 left, one buyer orders both in a single sale. attributedTo (a single string) can't
+  // represent that, so a sale that needs it instead carries splitQty: {Jon:n, Jax:m} (summing to
+  // quantitySold) and attributedTo is left null. This is the ONE place that reads either shape: it
+  // answers "how much of this one sale, in quantity and in payout, is actually owner's", prorating
+  // the sale's total netProfit by quantity share for a split sale, or the plain whole-sale amount
+  // for an ordinary single-owner one. Every money function below goes through this, specifically
+  // so a split sale is handled correctly everywhere at once rather than needing its own special
+  // case re-invented in each one.
+  function ownerShareOfSale(s, owner){
+    var total = Number(s.quantitySold||1);
+    if (s.splitQty){
+      var q = Number(s.splitQty[owner]||0);
+      return q>0 ? { qty:q, profit: round2(Number(s.netProfit||0) * q/total) } : { qty:0, profit:0 };
+    }
+    return s.attributedTo === owner ? { qty: total, profit: Number(s.netProfit||0) } : { qty:0, profit:0 };
+  }
+  // Every owner with any real stake in a sale -- one name for an ordinary sale, both for a split one.
+  function saleOwners(s){
+    if (s.splitQty) return ["Jon","Jax"].filter(function(o){ return Number(s.splitQty[o]||0) > 0; });
+    return s.attributedTo ? [s.attributedTo] : [];
+  }
   function computeBalance(){
     var bal = 0;
-    state.sales.forEach(function(s){ if (s.attributedTo === "Jon" && s.lifecycleStatus === "completed") bal += Number(s.netProfit||0); });
+    state.sales.forEach(function(s){ if (s.lifecycleStatus === "completed") bal += ownerShareOfSale(s, "Jon").profit; });
     state.settlements.forEach(function(t){
       if (t.from === "Jax" && t.to === "Jon") bal -= Number(t.amount||0);
       else if (t.from === "Jon" && t.to === "Jax") bal += Number(t.amount||0);
@@ -1121,7 +1145,11 @@
   // into one misleading number.
   function pendingBalance(){
     var bal = 0, count = 0;
-    state.sales.forEach(function(s){ if (s.attributedTo === "Jon" && s.lifecycleStatus === "pending"){ bal += Number(s.netProfit||0); count++; } });
+    state.sales.forEach(function(s){
+      if (s.lifecycleStatus !== "pending") return;
+      var sh = ownerShareOfSale(s, "Jon");
+      if (sh.qty > 0){ bal += sh.profit; count++; }
+    });
     return { amount: bal, count: count };
   }
   // computeBalance()/pendingBalance() are deliberately Jon-only — that's correct for "the debt
@@ -1133,15 +1161,16 @@
   function ownerProfitBreakdown(owner){
     var available = 0, pending = 0, pendingCount = 0;
     state.sales.forEach(function(s){
-      if (s.attributedTo !== owner) return;
-      if (s.lifecycleStatus === "pending"){ pending += Number(s.netProfit||0); pendingCount++; }
-      else available += Number(s.netProfit||0);
+      var sh = ownerShareOfSale(s, owner);
+      if (!sh.qty) return;
+      if (s.lifecycleStatus === "pending"){ pending += sh.profit; pendingCount++; }
+      else available += sh.profit;
     });
     return { total: available+pending, available: available, pending: pending, pendingCount: pendingCount };
   }
   function ownerSalesList(owner, statusFilter){
     return state.sales.filter(function(s){
-      if (s.attributedTo !== owner) return false;
+      if (!ownerShareOfSale(s, owner).qty) return false;
       if (statusFilter === "pending") return s.lifecycleStatus === "pending";
       if (statusFilter === "paid") return s.lifecycleStatus === "completed";
       return true;
@@ -1164,7 +1193,7 @@
   // apply to. That is what keeps sum(every row's owedAmount) + unallocated == computeBalance()
   // exactly, in both cases -- the identity test_sales_filters_and_breakdowns.py checks.
   function jonDebtAllocation(){
-    var paid = state.sales.filter(function(s){ return s.attributedTo === "Jon" && s.lifecycleStatus === "completed"; })
+    var paid = state.sales.filter(function(s){ return s.lifecycleStatus === "completed" && ownerShareOfSale(s, "Jon").qty > 0; })
       .sort(function(a,b){ return (Date.parse(a.saleDate)||0) - (Date.parse(b.saleDate)||0) || (a.createdAt||0) - (b.createdAt||0); });
     var paidIds = {};
     paid.forEach(function(s){ paidIds[s.id] = true; });
@@ -1191,7 +1220,7 @@
     var remaining = Math.max(0, round2(legacyPool));
     var clippedTotal = 0;
     var rows = paid.map(function(s){
-      var amt = round2(Number(s.netProfit || 0));
+      var amt = round2(ownerShareOfSale(s, "Jon").profit);  // Jon's own prorated share for a split sale, the whole payout otherwise
       var raw = Math.max(0, settledMap[s.id] || 0);
       var already = round2(Math.min(amt, raw));
       // If the sale's own payout was corrected DOWN after an allocation already covered more than
@@ -1436,6 +1465,21 @@
   // What did the units in THIS sale cost? Oldest purchase first (FIFO), per owner and item: the first
   // units sold count as the first units bought. A later purchase at a different price therefore never
   // changes what an earlier sale cost. A sale whose units land on an unpriced purchase has no cost yet.
+  // Draws `qty` units out of the given owner's FIFO lot list (oldest first), returning the
+  // resulting per-unit cost, or null if either not enough logged purchase covers it yet, or any
+  // lot it draws from has no price logged. Shared by the plain single-owner sale below and a split
+  // sale's two independent per-owner draws (each owner's share only ever costs against THEIR OWN
+  // purchases, never the other owner's -- Jon's half of a shared order was bought with Jon's money).
+  function drawFifo(pools, key, qty){
+    var need = qty, tot = 0, ok = true;
+    (pools[key] || []).forEach(function(lot){
+      if (need<=0 || lot.left<=0) return;
+      var take = Math.min(lot.left, need);
+      lot.left -= take; need -= take;
+      if (lot.unit==null) ok = false; else tot += take*lot.unit;
+    });
+    return (ok && need<=0) ? tot/qty : null;
+  }
   function fifoCosts(){
     var m = memoStore && memoStore.fifo;
     if (m) return m;
@@ -1445,32 +1489,63 @@
       (pools[k] = pools[k] || []).push({ left:Number(b.quantity||0), unit:costLogged(b) ? Number(b.unitCost||0) : null });
     });
     state.sales.slice().sort(function(a,b){ return String(a.saleDate||"").localeCompare(String(b.saleDate||"")) || (a.createdAt||0)-(b.createdAt||0); }).forEach(function(s){
+      if (s.splitQty){
+        var res = {};
+        ["Jon","Jax"].forEach(function(o){
+          var q = Number(s.splitQty[o]||0);
+          res[o] = q>0 ? drawFifo(pools, groupKeyForSale(s)+"|"+o, q) : null;
+        });
+        out[s.id] = res;  // {Jon: unitCost|null, Jax: unitCost|null} -- see unitCostFor()
+        return;
+      }
       if (!s.attributedTo){ out[s.id] = null; return; }
-      var qty = Number(s.quantitySold||1), need = qty, tot = 0, ok = true;
-      (pools[groupKeyForSale(s) + "|" + s.attributedTo] || []).forEach(function(lot){
-        if (need<=0 || lot.left<=0) return;
-        var take = Math.min(lot.left, need);
-        lot.left -= take; need -= take;
-        if (lot.unit==null) ok = false; else tot += take*lot.unit;
-      });
-      out[s.id] = (ok && need<=0) ? tot/qty : null;
+      out[s.id] = drawFifo(pools, groupKeyForSale(s) + "|" + s.attributedTo, Number(s.quantitySold||1));
     });
     if (memoStore) memoStore.fifo = out;
     return out;
   }
-  function unitCostFor(s){
+  // Plain sale: a single per-unit cost number, same as always. Split sale: fifoCosts() stores an
+  // {Jon,Jax} object instead, so the caller MUST say whose cost it wants -- there is no single
+  // "the" unit cost for a sale two different people partly paid for.
+  function unitCostFor(s, owner){
     var u = fifoCosts()[s.id];
-    return u==null ? null : u;
+    if (u == null) return null;
+    if (typeof u === "object") return (owner && u[owner] != null) ? u[owner] : null;
+    return u;
   }
+  // This sale's total profit: the combined payout minus the combined cost, each owner's own share
+  // costed against their own purchases for a split sale. Unknown (null) the instant ANY owner's
+  // share has no cost logged yet, same "not fully priced" convention as an ordinary sale.
   function saleProfit(s){
+    if (s.splitQty){
+      var total = Number(s.quantitySold||1), profit = 0;
+      for (var oKey in s.splitQty){
+        var q = Number(s.splitQty[oKey]||0); if (!q) continue;
+        var u = unitCostFor(s, oKey);
+        if (u == null) return null;
+        profit += (Number(s.netProfit||0) * q/total) - u*q;
+      }
+      return round2(profit);
+    }
     var u = unitCostFor(s);
     return u==null ? null : Number(s.netProfit||0) - u*Number(s.quantitySold||1);
+  }
+  // One owner's own profit share of one sale -- their prorated payout minus THEIR OWN per-unit
+  // cost for their share of the quantity. Not the same number as saleProfit(s): that one is the
+  // sale's combined total (both owners' shares together, for the row's own display), this is what
+  // ownerRealProfit() below needs to add up one person's total real profit without double-counting
+  // or crediting them for the other owner's half of a split sale.
+  function ownerSaleProfit(s, owner){
+    var share = ownerShareOfSale(s, owner);
+    if (!share.qty) return null;
+    var u = unitCostFor(s, s.splitQty ? owner : undefined);
+    return u==null ? null : round2(share.profit - u*share.qty);
   }
   function ownerRealProfit(owner){
     var known = 0, missing = 0;
     state.sales.forEach(function(s){
-      if (s.attributedTo!==owner) return;
-      var pr = saleProfit(s);
+      if (!ownerShareOfSale(s, owner).qty) return;
+      var pr = ownerSaleProfit(s, owner);
       if (pr==null) missing++; else known += pr;
     });
     return { profit:known, missing:missing };
@@ -1495,7 +1570,7 @@
       if (u.Jon>0 || u.Jax>0) return;                                  // purchases already recorded
       var qty = g.reduce(function(a,s){ return a + Number(s.quantitySold||1); }, 0);
       if (qty < 2) return;                                             // one unit: the plain owner prompt covers it
-      if (!g.some(function(s){ return !s.attributedTo; })) return;     // everything already has an owner
+      if (!g.some(function(s){ return !s.attributedTo && !s.splitQty; })) return;     // everything already has an owner (or a split)
       out.push({ key:k, sales:g, pids:pids, qty:qty });
     });
     return out;
@@ -1503,12 +1578,33 @@
   function needsOwnerSales(){
     var inGroup = {};
     purchaseGroups().forEach(function(g){ g.sales.forEach(function(s){ inGroup[s.id] = true; }); });
-    return state.sales.filter(function(s){ return !s.attributedTo && !inGroup[s.id]; });
+    return state.sales.filter(function(s){ return !s.attributedTo && !s.splitQty && !inGroup[s.id]; });
+  }
+  // An allocation result is a plain owner string for an ordinary sale, or {Jon:n, Jax:m} for one
+  // that had to be split (see allocateSales() below) -- every caller that reads units out of a
+  // result needs both shapes, so it is one small helper rather than an if(typeof) repeated at
+  // every call site.
+  function allocQty(raw, s, owner){
+    if (!raw) return 0;
+    if (typeof raw === "object") return Number(raw[owner]||0);
+    return raw === owner ? Number(s.quantitySold||1) : 0;
   }
   function allocateSales(sales, units){
     var left = { Jon:units.Jon, Jax:units.Jax }, res = {};
     function isAuto(s){ return s.ownerSource==="auto" && s.lifecycleStatus!=="completed"; }
-    sales.forEach(function(s){ if (!isAuto(s) && left[s.attributedTo]!==undefined) left[s.attributedTo] -= Number(s.quantitySold||0); });
+    // A sale that is no longer up for auto-reassignment (already paid out, or someone fixed it by
+    // hand) still has real units committed against it -- including a PAST split, which this exact
+    // same allocation once produced -- and those have to come out of what is left to hand out now,
+    // the same as an ordinary single-owner sale always did.
+    sales.forEach(function(s){
+      if (isAuto(s)) return;
+      var raw = s.splitQty || s.attributedTo;
+      if (!raw) return;
+      if (typeof raw === "object"){
+        if (left.Jon!==undefined) left.Jon -= Number(raw.Jon||0);
+        if (left.Jax!==undefined) left.Jax -= Number(raw.Jax||0);
+      } else if (left[raw]!==undefined) left[raw] -= Number(s.quantitySold||0);
+    });
     var perUnit = function(s){ return Number(s.netProfit||0) / Math.max(Number(s.quantitySold||1), 1); };
     // An order can't be split across owners, so a multi-unit order is the hard-to-place piece and
     // has to be decided FIRST, while both pools are still at their fullest -- standard largest-
@@ -1524,12 +1620,23 @@
     // while Jon's full 13 and Jax's full 2 are both still available, and the seven flexible singles
     // mop up whatever each person has left -- the exact 13/2 split Jon actually entered.
     sales.filter(isAuto).sort(function(a,b){ return Number(b.quantitySold||1)-Number(a.quantitySold||1) || perUnit(b)-perUnit(a); }).forEach(function(s){
-      var q = Number(s.quantitySold||1), owner = null;
+      var q = Number(s.quantitySold||1), owner = null, split = null;
       if (left.Jon >= q) owner = "Jon";
       else if (left.Jax >= q) owner = "Jax";
-      else if (left.Jon>0 || left.Jax>0) owner = left.Jon >= left.Jax ? "Jon" : "Jax"; // an order can't be split: whoever has more units left takes it
-      if (owner) left[owner] -= q;
-      res[s.id] = owner;
+      else if (left.Jon>0 || left.Jax>0){
+        // One real order CAN legitimately draw from both people's stock -- Jon has 1 left, Jax has
+        // 1 left, one buyer orders both in a single sale. Rather than dumping the whole order on
+        // whoever has more left (which used to let one person's count run over while the other's
+        // came up short for no reason), each person gets exactly what they still have, up to what
+        // the order actually needs -- a real split, only when it does not fit whole into either
+        // pool on its own and both still have room.
+        var jonPart = Math.min(Math.max(left.Jon,0), q);
+        var jaxPart = Math.min(Math.max(left.Jax,0), q - jonPart);
+        if (jonPart>0 && jaxPart>0) split = { Jon:jonPart, Jax:jaxPart };
+        else owner = jonPart>0 ? "Jon" : (jaxPart>0 ? "Jax" : null);
+      }
+      if (split){ left.Jon -= split.Jon; left.Jax -= split.Jax; res[s.id] = split; }
+      else { if (owner) left[owner] -= q; res[s.id] = owner; }
     });
     return res;
   }
@@ -1546,11 +1653,14 @@
       .forEach(function(b){ undo.removed.push(Object.assign({}, b)); deleteBatch(b.id); });
     var alloc = allocateSales(g.sales, counts);
     var ownerOf = {};
-    g.sales.forEach(function(s){ ownerOf[s.id] = (s.id in alloc) ? alloc[s.id] : s.attributedTo; });
+    g.sales.forEach(function(s){ ownerOf[s.id] = (s.id in alloc) ? alloc[s.id] : (s.splitQty || s.attributedTo); });
     g.sales.forEach(function(s){
       if (!(s.id in alloc)) return;
-      undo.sales.push({ id:s.id, attributedTo:s.attributedTo||null, needsOwner:!!s.needsOwner, ownerSource:s.ownerSource||null });
-      updateSale(s.id, { attributedTo: alloc[s.id], needsOwner: alloc[s.id]===null, ownerSource:"auto" });
+      var result = alloc[s.id], isSplit = result && typeof result === "object";
+      undo.sales.push({ id:s.id, attributedTo:s.attributedTo||null, splitQty:s.splitQty||null, needsOwner:!!s.needsOwner, ownerSource:s.ownerSource||null });
+      updateSale(s.id, isSplit
+        ? { attributedTo: null, splitQty: result, needsOwner: false, ownerSource: "auto" }
+        : { attributedTo: result, splitQty: null, needsOwner: result===null, ownerSource: "auto" });
     });
     // batches per owner per listing, sized to the sales that owner ends up with; anything bought
     // beyond what has sold so far sits on hand under the listing with the most sales
@@ -1561,8 +1671,8 @@
     ["Jon","Jax"].forEach(function(o){
       var used = 0;
       g.pids.forEach(function(pid){
-        var mine = g.sales.filter(function(s){ return s.productId===pid && ownerOf[s.id]===o; });
-        var q = mine.reduce(function(a,s){ return a + Number(s.quantitySold||1); }, 0);
+        var mine = g.sales.filter(function(s){ return s.productId===pid && allocQty(ownerOf[s.id], s, o) > 0; });
+        var q = mine.reduce(function(a,s){ return a + allocQty(ownerOf[s.id], s, o); }, 0);
         if (!q) return;
         used += q;
         var allShipped = mine.every(function(s){ return s.ebayShipped || s.lifecycleStatus==="completed"; });
@@ -1584,7 +1694,7 @@
     lastPurchaseUndo = null;
     u.created.forEach(function(id){ if (id) deleteBatch(id); });
     u.removed.forEach(function(b){ var d = Object.assign({}, b); delete d.id; addBatch(d); });
-    u.sales.forEach(function(x){ updateSale(x.id, { attributedTo:x.attributedTo, needsOwner:x.needsOwner, ownerSource:x.ownerSource }); });
+    u.sales.forEach(function(x){ updateSale(x.id, { attributedTo:x.attributedTo, splitQty:x.splitQty!==undefined ? x.splitQty : null, needsOwner:x.needsOwner, ownerSource:x.ownerSource }); });
     toast("Undone — back to how it was");
   }
   // Nothing is written until this screen is confirmed: it shows the exact units per person and
@@ -1597,9 +1707,12 @@
     pendingBought = { key:key, counts:counts, cost:(pendingBought && pendingBought.key===key && pendingBought.cost) || "" };
     var alloc = allocateSales(g.sales, counts), units = { Jon:0, Jax:0 };
     var rows = g.sales.slice().sort(function(a,b){ return Number(b.netProfit||0)-Number(a.netProfit||0); }).map(function(s){
-      var o = (s.id in alloc) ? alloc[s.id] : s.attributedTo, q = Number(s.quantitySold||1);
-      if (o) units[o] += q;
-      return "<div class='confirm-row'><span>"+money(s.netProfit)+" · "+esc(s.buyerName||"buyer")+(q>1?" · ×"+q:"")+"</span>"+(o ? ownerPill(o) : "<span class='badge owner-none'>Unassigned</span>")+"</div>";
+      var o = (s.id in alloc) ? alloc[s.id] : (s.splitQty || s.attributedTo), q = Number(s.quantitySold||1);
+      var pill;
+      if (o && typeof o === "object"){ units.Jon += Number(o.Jon||0); units.Jax += Number(o.Jax||0); pill = splitPill(o); }
+      else if (o){ units[o] += q; pill = ownerPill(o); }
+      else pill = "<span class='badge owner-none'>Unassigned</span>";
+      return "<div class='confirm-row'><span>"+money(s.netProfit)+" · "+esc(s.buyerName||"buyer")+(q>1?" · ×"+q:"")+"</span>"+pill+"</div>";
     }).join("");
     var covered = units.Jon + units.Jax;
     var notes = "";
@@ -1613,7 +1726,8 @@
       "<div class='sale-sub' style='margin:2px 0 6px'>Each sale would go to:</div><div class='confirm-list'>"+rows+"</div>"+notes+
       "<div class='field' style='margin-top:14px'><label for='p_cost'>Unit cost each ($) <span class='opt'>optional</span></label>"+
       "<input id='p_cost' type='number' min='0' step='0.01' inputmode='decimal' placeholder='0.00' value='"+esc(pendingBought.cost)+"'>"+
-      "<div class='hint'>What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set.</div></div>",
+      "<div class='hint'>What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set.</div>"+
+      "<button type='button' class='linkbtn' style='margin-top:8px' data-action='confirm-then-trip' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Bought other items on the same receipt? Log the full total instead &rarr;</button></div>",
       "<button class='btn' data-action='bought-split' data-key='"+esc(key)+"'>Back</button>"+
       "<button class='btn primary' data-action='confirm-purchase' data-key='"+esc(key)+"' data-jon='"+counts.Jon+"' data-jax='"+counts.Jax+"'>Confirm</button>");
   }
@@ -1722,6 +1836,7 @@
     openOwnerConfirm([saleId], sa.attributedTo==="Jon" ? "Jax" : "Jon", true);
   }
   function ownerBadge(s){
+    if (s.splitQty) return splitPill(s.splitQty);  // two owners on one sale -- no single "flip" makes sense, edit it directly instead
     if (!s.attributedTo) return "<span class='badge owner-none'>Unassigned</span>";
     return "<button type='button' class='badge owner-"+s.attributedTo+"' data-action='flip-owner' data-id='"+s.id+"' title='Tap to give this sale to "+(s.attributedTo==="Jon"?"Jax":"Jon")+"'>"+s.attributedTo+"</button>";
   }
@@ -1732,7 +1847,10 @@
     html += costCardHtml();
     // --- who earns what
     var by = { Jon:0, Jax:0, none:0 };
-    state.sales.forEach(function(sa){ by[sa.attributedTo==="Jon" ? "Jon" : sa.attributedTo==="Jax" ? "Jax" : "none"] += Number(sa.netProfit||0); });
+    state.sales.forEach(function(sa){
+      var jon = ownerShareOfSale(sa,"Jon").profit, jax = ownerShareOfSale(sa,"Jax").profit;
+      by.Jon += jon; by.Jax += jax; by.none += Number(sa.netProfit||0) - jon - jax;
+    });
     var all = by.Jon + by.Jax + by.none;
     var pct = function(v){ return all>0 ? Math.round(v/all*100) : 0; };
     html += "<div class='card dash-card'><div class='dash-head'><h3>Payout by person</h3><span class='count'>"+money(all)+"</span></div>"+
@@ -2021,6 +2139,10 @@
   function ownerPill(o){
     return (o==="Jon"||o==="Jax") ? "<span class='badge owner-"+o+"'>"+o+"</span>" : "<span class='badge owner-none'>"+esc(o||"No owner")+"</span>";
   }
+  // One sale, both owners -- used wherever a split shows instead of a single ownerPill.
+  function splitPill(split){
+    return "<span class='badge owner-split'>Split — Jon ×"+Number(split.Jon||0)+" / Jax ×"+Number(split.Jax||0)+"</span>";
+  }
   function productGroupList(){
     if (memoStore && memoStore.pgl) return memoStore.pgl;
     // a product with no sale and no batch has nothing to show (its only sale was removed)
@@ -2195,6 +2317,7 @@
     var sa = state.sales.find(function(x){ return x.id===saleId; });
     if (!sa){ toast("That sale is no longer in the ledger"); return; }
     if (sa.attributedTo){ toast("That sale already goes to "+sa.attributedTo); return; }
+    if (sa.splitQty){ toast("That sale is already split between Jon and Jax"); return; }
     openModal("Who gets this sale?",
       "<div class='confirm-list'>"+ownerConfirmRows([saleId])+"</div><div class='hint'>Pick the person it goes to. You confirm on the next screen.</div>",
       "<button class='btn' data-action='close-modal'>Cancel</button>"+
@@ -2507,7 +2630,7 @@
     var notRecv = linked.filter(function(b){ return b.status!=="received"; });
     var stockTag = "", recvBtn = "";
     var payTag = s.lifecycleStatus ? "<span class='badge lifecycle-"+s.lifecycleStatus+"'>"+(s.lifecycleStatus==="pending"?"Pending payout":"Paid out")+"</span>" : "";
-    var autoTag = (s.ownerSource==="auto" && s.attributedTo && s.lifecycleStatus!=="completed") ? "<span class='badge label-note' title='Split automatically by who bought what. It can shift as more orders arrive until this one is paid out — tap the owner to lock it.'>Auto-split</span>" : "";
+    var autoTag = (s.ownerSource==="auto" && (s.attributedTo || s.splitQty) && s.lifecycleStatus!=="completed") ? "<span class='badge label-note' title='Split automatically by who bought what. It can shift as more orders arrive until this one is paid out — tap the owner to lock it.'>Auto-split</span>" : "";
     var labelTag = (s.profitSource==="ebay-provisional" && s.ebayShipped && s.lifecycleStatus!=="completed") ? "<span class='badge label-note' title='eBay hasn&#39;t reported the shipping label cost yet, so this is before it'>Before label cost</span>" : "";
     return "<div class='sale-row'>"+prodThumb(p, name)+
       "<div class='sale-main'>"+
@@ -2550,11 +2673,12 @@
     function matchesStatus(sa, f){
       if (f==="pending") return sa.lifecycleStatus==="pending";
       if (f==="paid") return sa.lifecycleStatus==="completed";
-      if (f==="unassigned") return !sa.attributedTo;
+      if (f==="unassigned") return !sa.attributedTo && !sa.splitQty;
       if (f==="nocost") return saleProfit(sa)==null;
       return true; // "all"
     }
-    function matchesOwner(sa){ return salesOwner==="all" || sa.attributedTo===salesOwner; }
+    // A split sale matches EITHER owner's filter -- it is genuinely both people's, not neither.
+    function matchesOwner(sa){ return salesOwner==="all" || (sa.splitQty ? Number(sa.splitQty[salesOwner]||0)>0 : sa.attributedTo===salesOwner); }
     var statusPool = live.filter(matchesOwner);
     var cancPool = canc.filter(matchesOwner);
     // "All" mirrors what actually shows under that chip -- live AND cancelled together, same as
@@ -2564,11 +2688,14 @@
       if (saleProfit(sa)==null) counts.nocost++;
       if (sa.lifecycleStatus==="pending") counts.pending++;
       if (sa.lifecycleStatus==="completed") counts.paid++;
-      if (!sa.attributedTo) counts.unassigned++;
+      if (!sa.attributedTo && !sa.splitQty) counts.unassigned++;
     });
     var ownerPool = salesFilter==="cancelled" ? canc : live.filter(function(sa){ return matchesStatus(sa, salesFilter); });
     var ownerCounts = { all:ownerPool.length, Jon:0, Jax:0 };
-    ownerPool.forEach(function(sa){ if (sa.attributedTo==="Jon" || sa.attributedTo==="Jax") ownerCounts[sa.attributedTo]++; });
+    ownerPool.forEach(function(sa){
+      if (sa.splitQty){ if (Number(sa.splitQty.Jon||0)>0) ownerCounts.Jon++; if (Number(sa.splitQty.Jax||0)>0) ownerCounts.Jax++; }
+      else if (sa.attributedTo==="Jon" || sa.attributedTo==="Jax") ownerCounts[sa.attributedTo]++;
+    });
     // Two dropdowns, not a wall of pill buttons -- status and owner still combine (pick "Paid
     // out" in one and "Jon" in the other, independently), it just doesn't take a whole shelf of
     // chips to show it. Each option's own count updates with the OTHER dropdown's current pick,
@@ -2612,13 +2739,29 @@
       (shown.length > salesShown ? "<div class='more-wrap'><button class='btn' data-action='sales-more'>Show "+Math.min(30, shown.length-salesShown)+" more · "+(shown.length-salesShown)+" left</button></div>" : "");
   }
   // every sale (and cancelled ones, marked) as a spreadsheet: for taxes and your own records
+  // One combined per-unit cost for a sale, for the CSV's single "Cost per unit" column -- a plain
+  // sale's own unitCostFor(), or the quantity-weighted average of both owners' costs for a split
+  // one. Unknown (null) the instant either owner's share has no cost logged, same convention as
+  // everywhere else a sale's cost can be "not fully priced yet".
+  function displayUnitCost(s){
+    if (!s.splitQty) return unitCostFor(s);
+    var total = Number(s.quantitySold||1), cost = 0;
+    for (var o in s.splitQty){
+      var q = Number(s.splitQty[o]||0); if (!q) continue;
+      var u = unitCostFor(s, o);
+      if (u == null) return null;
+      cost += u*q;
+    }
+    return cost/total;
+  }
   function exportSalesCSV(){
     var q = function(v){ v = v==null ? "" : String(v); return /[",\n]/.test(v) ? '"'+v.replace(/"/g,'""')+'"' : v; };
     var head = ["Sale date","Order #","Item","Buyer","Qty","Payout","Goes to","Cost per unit","Total cost","Profit","Payout status","Order status"];
     var rows = state.sales.concat(state.cancelled||[]).slice().sort(bySaleNewest).map(function(sa){
       var pr = productById(sa.productId), cancelled = sa.orderState==="cancelled";
-      var unit = cancelled ? null : unitCostFor(sa), profit = cancelled ? null : saleProfit(sa);
-      return [sa.saleDate||"", sa.orderNumber||"", pr ? pr.name : "", sa.buyerName||"", sa.quantitySold||1, Number(sa.netProfit||0).toFixed(2), sa.attributedTo||"",
+      var unit = cancelled ? null : displayUnitCost(sa), profit = cancelled ? null : saleProfit(sa);
+      var goesTo = sa.splitQty ? saleOwners(sa).map(function(o){ return o+" ×"+sa.splitQty[o]; }).join(" / ") : (sa.attributedTo||"");
+      return [sa.saleDate||"", sa.orderNumber||"", pr ? pr.name : "", sa.buyerName||"", sa.quantitySold||1, Number(sa.netProfit||0).toFixed(2), goesTo,
               unit==null ? "" : unit.toFixed(2), unit==null ? "" : (unit*Number(sa.quantitySold||1)).toFixed(2), profit==null ? "" : profit.toFixed(2),
               sa.lifecycleStatus==="completed" ? "Paid out" : "Pending payout", cancelled ? "Cancelled or refunded" : (sa.orderState==="cancel_requested" ? "Cancel requested" : "Active")];
     });
@@ -2917,7 +3060,7 @@
     var box = $("#covAddResults"), input = $("#covAddSearch");
     if (!box || !input) return;
     var shownIds = coveredChecklistIds();
-    var addable = state.sales.filter(function(s){ return s.attributedTo === "Jon" && s.lifecycleStatus === "completed" && !shownIds[s.id]; })
+    var addable = state.sales.filter(function(s){ return ownerShareOfSale(s, "Jon").qty > 0 && s.lifecycleStatus === "completed" && !shownIds[s.id]; })
       .sort(function(a,b){ return (Date.parse(b.saleDate)||0) - (Date.parse(a.saleDate)||0); });
     var q = input.value.trim();
     if (q){
@@ -2987,6 +3130,22 @@
     if (action==="goto-costs"){ invFilter = "missing"; setTab("inventory"); return; }
     if (action==="sales-more"){ salesShown += 30; render(); return; }
     if (action==="confirm-purchase"){ applyPurchase(t.dataset.key, { Jon:t.dataset.jon, Jax:t.dataset.jax }, ($("#p_cost")||{}).value); pendingBought = null; closeModal(); return; }
+    // Locks in who bought what (same as Confirm), but leaves the cost blank instead of taking the
+    // flat "unit cost each" box -- then hands straight to the full receipt-total trip form (same
+    // one Costs' own "Add price" uses), for a checkout that also had other items and tax to split
+    // out. Built directly from the counts just confirmed, rather than via openItemTrip()'s usual
+    // "read it back off state.batches" path -- those batches were only just created and, against
+    // the real Firestore backend, will not have round-tripped back into state yet.
+    if (action==="confirm-then-trip"){
+      var ctKey = t.dataset.key, ctCounts = { Jon: Math.max(0, Math.floor(Number(t.dataset.jon)||0)), Jax: Math.max(0, Math.floor(Number(t.dataset.jax)||0)) };
+      applyPurchase(ctKey, ctCounts, "");
+      pendingBought = null;
+      var ctWho = ctCounts[whoAmI] ? whoAmI : (ctCounts.Jon ? "Jon" : "Jax");
+      var ctItems = {}; ctItems[ctKey] = { checked:true, qty:String(ctCounts[ctWho] || 1), price:"" };
+      pendingTrip = { only:ctKey, who:ctWho, total:"", other:"", otherQty:"1", mode:"prop", both:true, replace:false, items:ctItems };
+      openTripModal();
+      return;
+    }
     if (action==="undo-purchase"){ undoPurchase(); var tt = t.closest(".toast"); if (tt) tt.remove(); return; }
     if (action==="assign-owner"){ openOwnerConfirm([t.dataset.id], t.dataset.who, false); return; }
     if (action==="assign-all-owner"){ openOwnerConfirm(needsOwnerSales().map(function(x){ return x.id; }), t.dataset.who, false); return; }
@@ -3147,7 +3306,7 @@
         productId: editPid, quantitySold: editQty,
         saleDate: editDate, netProfit: ($("#f_profit").value==="" && prevSale.netProfit==null) ? null : (Number($("#f_profit").value)||0),
         soldPrice: $("#f_price").value ? Number($("#f_price").value) : null,
-        attributedTo: editWho, note: $("#f_note").value.trim(),
+        attributedTo: editWho, splitQty: null, note: $("#f_note").value.trim(),  // editing via the plain owner picker is an explicit override -- it always wins over a stale split
         buyerName: $("#f_buyer").value.trim() || null,
         orderNumber: $("#f_ordernum").value.trim() || null,
         lifecycleStatus: editFundsVal

@@ -1,7 +1,7 @@
 Jon bought 3, Jax 0, four sales: ['Jon', 'Jon', 'Jon', None]
 Jon 2, Jax 2, four sales: ['Jon', 'Jon', 'Jax', 'Jax']
 Jon 0, Jax 2, four sales: ['Jax', 'Jax', None, None]
-Jon 1, Jax 1, a 2-unit order: ['Jon']
+Jon 1, Jax 1, a 2-unit order: [{'Jon': 1, 'Jax': 1}]
 the real Delta Reign group (two 4-packs + seven singles), Jon 13 / Jax 2: ['Jon', 'Jon', 'Jon', 'Jon', 'Jon', 'Jon', 'Jon', 'Jax', 'Jax']
 units actually assigned -- want Jon 13, Jax 2 (exactly what was entered): 13 2
 errors: []

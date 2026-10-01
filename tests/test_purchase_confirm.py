@@ -41,6 +41,20 @@ try:
         print("toast:", pg.inner_text("#toastRoot").replace("\n", " "))
         pg.click(".toast-btn"); pg.wait_for_timeout(600)
         print("after undo owners:", owners("lucario"), "batches delta:", nb() - n0)
+
+        # "Bought other items on the same receipt?" -- locks in the owner split with the cost left
+        # blank (same as Confirm with an empty box), then hands straight to the full receipt-total
+        # trip form instead of closing, for a checkout that also had other, untracked items on it
+        pg.click("#ownerBanner .owner-queue-row:has-text('Lucario') >> text=Custom"); pg.wait_for_timeout(300)
+        pg.fill("#f_bj", "1"); pg.fill("#f_bx", "2")
+        pg.click("button[data-action='submit-bought']"); pg.wait_for_timeout(300)
+        print("link text present:", pg.locator("button[data-action='confirm-then-trip']").count())
+        pg.click("button[data-action='confirm-then-trip']"); pg.wait_for_timeout(400)
+        print("owners locked in before the trip form even opened:", owners("lucario"))
+        print("hands off straight into the trip form:", pg.inner_text(".modal-head h3"))
+        print("prefilled with the real quantity just confirmed, not 0:", pg.input_value(".trip-qty"))
+        print("cost left blank (needs review), not forced to $0:", pg.evaluate("(w) => { const S = window.__t.state(); const pid = S.products.find(p => p.name.toLowerCase().includes(w)).id; return S.batches.filter(b => b.productId === pid).map(b => [b.owner, b.quantity, b.costKnown]); }", "lucario"))
+        pg.click("button[data-action='close-modal']"); pg.wait_for_timeout(300)
         print("errors:", errs)
         b.close()
 finally:

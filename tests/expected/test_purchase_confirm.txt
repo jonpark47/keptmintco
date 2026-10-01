@@ -1,8 +1,13 @@
-confirm modal text: Confirm who bought this | ✕ | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario — 3 sold so far | 2 | Jon bought | 1 | Jax bought | Each sale would go to: | $49.40 · buyer19 · ×2 | Jon | $25.66 · buyer03 | Jax | Unit cost each ($) optional | What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set. | Back | Confirm
+confirm modal text: Confirm who bought this | ✕ | Pokemon TCG 30th Anniversary Tech Sticker Collection Lucario — 3 sold so far | 2 | Jon bought | 1 | Jax bought | Each sale would go to: | $49.40 · buyer19 · ×2 | Jon | $25.66 · buyer03 | Jax | Unit cost each ($) optional | What you paid per unit, tax included. Type 0 if it was free. Leave it blank to add it later; profit fills in once it's set. | Bought other items on
 after tap: batches changed? False | owners: [['buyer03', 25.66, None], ['buyer19', 49.4, None]]
 custom values: 2 1
 confirm 1/2: 1 Jon bought 2 Jax bought
 after confirm owners: [['buyer03', 25.66, 'Jon'], ['buyer19', 49.4, 'Jax']] batches added: 0
 toast: Saved — sales split by who bought what. Undo
 after undo owners: [['buyer03', 25.66, None], ['buyer19', 49.4, None]] batches delta: 0
+link text present: 1
+owners locked in before the trip form even opened: [['buyer03', 25.66, 'Jon'], ['buyer19', 49.4, 'Jax']]
+hands off straight into the trip form: Price for this item
+prefilled with the real quantity just confirmed, not 0: 1
+cost left blank (needs review), not forced to $0: [['Jax', 2, False]]
 errors: []
