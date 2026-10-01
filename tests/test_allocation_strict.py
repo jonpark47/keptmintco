@@ -19,6 +19,29 @@ try:
         print("Jon 2, Jax 2, four sales:", alloc(four, {"Jon": 2, "Jax": 2}))
         print("Jon 0, Jax 2, four sales:", alloc(four, {"Jon": 0, "Jax": 2}))
         print("Jon 1, Jax 1, a 2-unit order:", alloc([{"id": "x", "netProfit": 100, "quantitySold": 2}], {"Jon": 1, "Jax": 1}))
+
+        # the real group that failed live 2026-10-01: two 4-packs (the LOWEST per-unit profit of
+        # the bunch -- $201.64 and $199.54 each) plus seven singles (all over $200 per unit).
+        # Sorting by per-unit profit alone put both 4-packs last, by which point neither pool had
+        # room, and the tie-break handed the whole last 4-pack to Jon regardless -- Jon ended up
+        # with all 15 units, Jax with 0, even though Jon only said he bought 13.
+        delta_reign = [
+            {"id": "zippers", "netProfit": 806.57, "quantitySold": 4},
+            {"id": "chiefkk", "netProfit": 798.16, "quantitySold": 4},
+            {"id": "a2z", "netProfit": 207.09, "quantitySold": 1},
+            {"id": "coins", "netProfit": 206.48, "quantitySold": 1},
+            {"id": "jmhinnen", "netProfit": 205.85, "quantitySold": 1},
+            {"id": "ltmlc", "netProfit": 205.27, "quantitySold": 1},
+            {"id": "wayyn", "netProfit": 204.66, "quantitySold": 1},
+            {"id": "con", "netProfit": 202.52, "quantitySold": 1},
+            {"id": "benito", "netProfit": 201.93, "quantitySold": 1},
+        ]
+        result = alloc(delta_reign, {"Jon": 13, "Jax": 2})
+        jon_qty = sum(s["quantitySold"] for s, o in zip(delta_reign, result) if o == "Jon")
+        jax_qty = sum(s["quantitySold"] for s, o in zip(delta_reign, result) if o == "Jax")
+        print("the real Delta Reign group (two 4-packs + seven singles), Jon 13 / Jax 2:", result)
+        print("units actually assigned -- want Jon 13, Jax 2 (exactly what was entered):", jon_qty, jax_qty)
+
         print("errors:", errs)
         b.close()
 finally:

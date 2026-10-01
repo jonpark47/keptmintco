@@ -1510,7 +1510,20 @@
     function isAuto(s){ return s.ownerSource==="auto" && s.lifecycleStatus!=="completed"; }
     sales.forEach(function(s){ if (!isAuto(s) && left[s.attributedTo]!==undefined) left[s.attributedTo] -= Number(s.quantitySold||0); });
     var perUnit = function(s){ return Number(s.netProfit||0) / Math.max(Number(s.quantitySold||1), 1); };
-    sales.filter(isAuto).sort(function(a,b){ return perUnit(b)-perUnit(a); }).forEach(function(s){
+    // An order can't be split across owners, so a multi-unit order is the hard-to-place piece and
+    // has to be decided FIRST, while both pools are still at their fullest -- standard largest-
+    // first bin-packing. Sorting by per-unit profit alone (the old rule) processed every order by
+    // VALUE regardless of size, and a bulk order routinely has the lowest per-unit profit of the
+    // bunch (buying 4 at once rarely out-earns 4 separate single sales) -- so it got decided LAST,
+    // by which point neither pool had room left for it, and the tie-break below handed the WHOLE
+    // order to one person regardless of what they actually said they bought. Confirmed live
+    // 2026-10-01: Jon said 13/Jax said 2 on a real 15-unit group (two 4-packs + seven singles);
+    // sorting by profit alone put both 4-packs last and gave Jon all 15, Jax 0 -- "kept on hand:
+    // Jax 2" on a product that was not sitting in inventory at all, every unit already sold. Quantity
+    // descending first, per-unit profit descending to break ties, means the two 4-packs are placed
+    // while Jon's full 13 and Jax's full 2 are both still available, and the seven flexible singles
+    // mop up whatever each person has left -- the exact 13/2 split Jon actually entered.
+    sales.filter(isAuto).sort(function(a,b){ return Number(b.quantitySold||1)-Number(a.quantitySold||1) || perUnit(b)-perUnit(a); }).forEach(function(s){
       var q = Number(s.quantitySold||1), owner = null;
       if (left.Jon >= q) owner = "Jon";
       else if (left.Jax >= q) owner = "Jax";
